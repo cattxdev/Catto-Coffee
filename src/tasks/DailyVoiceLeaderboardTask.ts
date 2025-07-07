@@ -26,15 +26,27 @@ export class DailyVoiceLeaderboardTask extends ScheduledTask {
 				const channel = await this.getChannelId(guildId);
 
 				if (guildTop10.length && channel) {
+					let fetchedChannel;
+					try {
+						const fetched = await this.container.client.channels.fetch(channel);
+						if (!fetched?.isTextBased()) {
+							this.container.logger.warn(`Channel ${channel} for guild ${guildId} is not a text-based channel or no longer exists.`);
+							continue;
+						}
+						fetchedChannel = fetched as TextChannel;
+					} catch (error) {
+						this.container.logger.error(`Failed to fetch channel ${channel} for guild ${guildId}: ${error}`);
+						continue;
+					}
+
 					const buffer = await this.generateDailyVoiceLeaderboard(guildTop10);
 
-					const textChannel = (await this.container.client.channels.fetch(channel)) as TextChannel;
 					if (top.lastDailyMessageId) {
 						try {
-							const previousMessage = await textChannel.messages.fetch(top.lastDailyMessageId);
+							const previousMessage = await fetchedChannel.messages.fetch(top.lastDailyMessageId);
 							await previousMessage.delete();
 						} catch (error) {
-							this.container.console.error('Error deleting previous message:', error);
+							this.container.logger.error('Error deleting previous message:', error);
 						}
 					}
 
@@ -53,11 +65,13 @@ export class DailyVoiceLeaderboardTask extends ScheduledTask {
 						})
 						.setImage('attachment://leaderboard.png')
 						.setColor(Colors.White);
+
 					try {
-						const newMessage = await textChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
+						const newMessage = await fetchedChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
 						await this.updatedailyTopMessageId(guildId, newMessage.id);
 						await this.deletedailyVoiceExperience(guildId);
 					} catch (error) {
+						this.container.logger.error('Error sending leaderboard message:', error);
 					}
 				}
 				const newNextDate = addDays(now, 1);

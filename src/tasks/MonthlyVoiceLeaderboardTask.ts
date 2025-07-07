@@ -27,17 +27,30 @@ export class MonthlyVoiceLeaderboardTask extends ScheduledTask {
 				const channel = await this.getChannelId(guildId);
 
 				if (guildTop10.length && channel) {
+					let fetchedChannel;
+					try {
+						const fetched = await this.container.client.channels.fetch(channel);
+						if (!fetched?.isTextBased()) {
+							this.container.logger.warn(`Channel ${channel} for guild ${guildId} is not a text-based channel or no longer exists.`);
+							continue;
+						}
+						fetchedChannel = fetched as TextChannel;
+					} catch (error) {
+						this.container.logger.error(`Failed to fetch channel ${channel} for guild ${guildId}: ${error}`);
+						continue;
+					}
+
 					const buffer = await this.generateMonthlyVoiceLeaderboard(guildTop10);
 
-					const textChannel = (await this.container.client.channels.fetch(channel)) as TextChannel;
 					if (top.lastMonthlyMessageId) {
 						try {
-							const previousMessage = await textChannel.messages.fetch(top.lastMonthlyMessageId);
+							const previousMessage = await fetchedChannel.messages.fetch(top.lastMonthlyMessageId);
 							await previousMessage.delete();
 						} catch (error) {
-							this.container.console.error('Error deleting previous message:', error);
+							this.container.logger.error('Error deleting previous monthly leaderboard message:', error);
 						}
 					}
+
 					const timeZone = 'America/New_York';
 					const zonedDate = toZonedTime(nextPublishDate, timeZone);
 					const nextResetTime = format(zonedDate, 'HH:mm zzz', { timeZone });
@@ -52,9 +65,14 @@ export class MonthlyVoiceLeaderboardTask extends ScheduledTask {
 							iconURL: 'https://res.cloudinary.com/dp5dbsd8w/image/upload/v1717049320/badges/djrnims3eavniivxbqjs.webp'
 						})
 						.setImage('attachment://leaderboard.png');
-					const newMessage = await textChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
-					await this.updatemonthlyTopMessageId(guildId, newMessage.id);
-					await this.deletemonthlyVoiceExperience(guildId);
+
+					try {
+						const newMessage = await fetchedChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
+						await this.updatemonthlyTopMessageId(guildId, newMessage.id);
+						await this.deletemonthlyVoiceExperience(guildId);
+					} catch (error) {
+						this.container.logger.error('Error sending monthly leaderboard message:', error);
+					}
 				}
 
 				const newNextDate = addDays(now, 30);
@@ -62,6 +80,7 @@ export class MonthlyVoiceLeaderboardTask extends ScheduledTask {
 			}
 		}
 	}
+
 
 	private async getTop10VoiceUsers(guildId: string) {
 		const top = await this.container.prisma.voice_experience.findMany({

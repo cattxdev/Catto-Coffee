@@ -26,15 +26,27 @@ export class WeeklyVoiceLeaderboardTask extends ScheduledTask {
 				const channel = await this.getChannelId(guildId);
 
 				if (guildTop10.length && channel) {
+					let fetchedChannel;
+					try {
+						const fetched = await this.container.client.channels.fetch(channel);
+						if (!fetched?.isTextBased()) {
+							this.container.logger.warn(`Channel ${channel} for guild ${guildId} is not a text-based channel or no longer exists.`);
+							continue;
+						}
+						fetchedChannel = fetched as TextChannel;
+					} catch (error) {
+						this.container.logger.error(`Failed to fetch channel ${channel} for guild ${guildId}: ${error}`);
+						continue;
+					}
+
 					const buffer = await this.generateWeeklyVoiceLeaderboard(guildTop10);
 
-					const textChannel = (await this.container.client.channels.fetch(channel)) as TextChannel;
 					if (top.lastWeeklyMessageId) {
 						try {
-							const previousMessage = await textChannel.messages.fetch(top.lastWeeklyMessageId);
+							const previousMessage = await fetchedChannel.messages.fetch(top.lastWeeklyMessageId);
 							await previousMessage.delete();
 						} catch (error) {
-
+							this.container.logger.error('Error deleting previous weekly leaderboard message:', error);
 						}
 					}
 
@@ -52,17 +64,22 @@ export class WeeklyVoiceLeaderboardTask extends ScheduledTask {
 							iconURL: 'https://res.cloudinary.com/dp5dbsd8w/image/upload/v1717049320/badges/djrnims3eavniivxbqjs.webp'
 						})
 						.setImage('attachment://leaderboard.png');
-					const newMessage = await textChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
-					await this.updateWeeklyTopMessageId(guildId, newMessage.id);
-					await this.deleteWeeklyVoiceExperience(guildId);
+
+					try {
+						const newMessage = await fetchedChannel.send({ embeds: [embed], files: [{ attachment: buffer, name: 'leaderboard.png' }] });
+						await this.updateWeeklyTopMessageId(guildId, newMessage.id);
+						await this.deleteWeeklyVoiceExperience(guildId);
+					} catch (error) {
+						this.container.logger.error('Error sending weekly leaderboard message:', error);
+					}
 				}
 
 				const newNextDate = addDays(now, 7); // 1 week
 				await this.updateNextPublishDate(guildId, newNextDate);
 			}
 		}
-
 	}
+
 
 	private async getTop10VoiceUsers(guildId: string) {
 		const top = await this.container.prisma.voice_experience.findMany({

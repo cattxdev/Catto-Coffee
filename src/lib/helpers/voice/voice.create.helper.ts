@@ -41,6 +41,16 @@ export class VoiceCreateHelper extends Helper {
 		const channel = await this.buildChannel(guild, channel_details.name, channel_details.userLimit, parent, permissions);
 
 		if (!channel) return;
+		const currentChannelId = newState.member?.voice.channelId;
+
+		if (currentChannelId !== channelId) {
+			container.console.warn(`User ${user_id} left or moved from the trigger channel before move could happen. Skipping channel move.`, {
+				userId: user_id,
+				expectedChannelId: channelId,
+				currentChannelId
+			});
+			return;
+		}
 
 		try {
 			await newState.setChannel(channel);
@@ -109,9 +119,9 @@ export class VoiceCreateHelper extends Helper {
 
 			return userSettings
 				? {
-						channelName: userSettings.channelName || '',
-						channelLimit: userSettings.channelLimit || 0
-					}
+					channelName: userSettings.channelName || '',
+					channelLimit: userSettings.channelLimit || 0
+				}
 				: null;
 		} catch (error) {
 			container.console.error(`Error fetching user channel info for user ${userId}: ${error}`, { userId });
