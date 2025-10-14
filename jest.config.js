@@ -10,6 +10,9 @@ module.exports = {
     '!src/**/__tests__/**',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapper: {
+    '^#/(.*)$': '<rootDir>/src/$1',
+  },
   verbose: true,
   transform: {
     '^.+\\.ts$': ['ts-jest', {

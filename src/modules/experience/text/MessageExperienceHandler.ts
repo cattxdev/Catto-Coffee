@@ -4,12 +4,12 @@
  */
 
 import type { Message } from 'discord.js';
-import type { BotClient } from '../../structures/BotClient';
-import { TextExperienceService } from './TextExperienceService';
-import { ExperienceCacheService } from './ExperienceCacheService';
-import { ExperienceCalculator } from './ExperienceCalculator';
-import logger from '../../utils/logger';
 import { ChannelType } from 'discord.js';
+import type { BotClient } from '#/structures/BotClient';
+import logger from '#/utils/logger';
+import { TextExperienceService } from './TextExperienceService';
+import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
+import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
 
 /**
  * Handler for awarding text experience on message creation
@@ -167,32 +167,32 @@ export class MessageExperienceHandler {
                 .replace(/{user\.username}/g, message.author.username)
                 .replace(/{user\.tag}/g, message.author.tag)
                 .replace(/{user\.id}/g, message.author.id)
-                
+
                 // Level info
                 .replace(/{level}/g, currentLevel.toString())
                 .replace(/{level\.new}/g, currentLevel.toString())
                 .replace(/{level\.old}/g, levelUp.oldLevel.toString())
                 .replace(/{level\.formatted}/g, ExperienceCalculator.formatLevel(currentLevel))
-                
+
                 // XP info
                 .replace(/{xp}/g, ExperienceCalculator.formatXp(totalXp))
                 .replace(/{xp\.total}/g, ExperienceCalculator.formatXp(totalXp))
                 .replace(/{xp\.current}/g, ExperienceCalculator.formatXp(currentLevelXp))
                 .replace(/{xp\.needed}/g, ExperienceCalculator.formatXp(xpForNextLevel))
                 .replace(/{xp\.progress}/g, `${Math.floor(progress)}%`)
-                
+
                 // Server info
                 .replace(/{server}/g, message.guild!.name)
                 .replace(/{server\.name}/g, message.guild!.name)
                 .replace(/{server\.id}/g, message.guild!.id)
                 .replace(/{server\.members}/g, message.guild!.memberCount.toString())
-                
+
                 // Rewards
-                .replace(/{rewards}/g, levelUp.rewards.length > 0 
+                .replace(/{rewards}/g, levelUp.rewards.length > 0
                     ? levelUp.rewards.map((roleId: string) => `<@&${roleId}>`).join(', ')
                     : 'None')
                 .replace(/{rewards\.count}/g, levelUp.rewards.length.toString())
-                
+
                 // Calculation info
                 .replace(/{calculation\.base}/g, ExperienceCalculator.formatXp(result.calculation?.baseXp || 0))
                 .replace(/{calculation\.multiplier}/g, (result.calculation?.multiplier || 1).toFixed(2))
@@ -211,11 +211,11 @@ export class MessageExperienceHandler {
     private getDefaultLevelUpMessage(message: Message, result: any): string {
         const { currentLevel, levelUp } = result;
         let msg = `🎉 Congratulations ${message.author}! You've reached level **${currentLevel}**!`;
-        
+
         if (levelUp.rewards.length > 0) {
             msg += `\n🎁 **Rewards:** ${levelUp.rewards.map((roleId: string) => `<@&${roleId}>`).join(', ')}`;
         }
-        
+
         return msg;
     }
 }

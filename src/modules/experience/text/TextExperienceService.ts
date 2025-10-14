@@ -3,11 +3,11 @@
  * @author Catto Bot Team
  */
 
-import type { PrismaClient } from '../../../generated/prisma';
-import { ExperienceType, AuditLogAction } from '../../../generated/prisma';
-import logger from '../../utils/logger';
-import { ExperienceCalculator } from './ExperienceCalculator';
-import { ExperienceCacheService } from './ExperienceCacheService';
+import type { PrismaClient } from '../../../../generated/prisma';
+import { ExperienceType, AuditLogAction } from '../../../../generated/prisma';
+import logger from '../../../utils/logger';
+import { ExperienceCacheService } from '../ExperienceCacheService';
+import { ExperienceCalculator } from '../ExperienceCalculator';
 import {
     type ExperienceCalculation,
     type ExperienceGainResult,
@@ -17,7 +17,7 @@ import {
     type LeaderboardOptions,
     type ExperienceStats,
     type AppliedMultiplier,
-} from './types';
+} from '../types';
 
 /**
  * Text Experience Service
@@ -27,7 +27,7 @@ export class TextExperienceService {
     constructor(
         private readonly prisma: PrismaClient,
         private readonly cache: ExperienceCacheService
-    ) {}
+    ) { }
 
     // ============================================================================
     // CORE EXPERIENCE METHODS
@@ -193,7 +193,7 @@ export class TextExperienceService {
      */
     async checkCooldown(userId: string, guildId: string): Promise<CooldownResult> {
         const isOnCooldown = await this.cache.isOnCooldown(guildId, userId);
-        
+
         if (!isOnCooldown) {
             return {
                 onCooldown: false,

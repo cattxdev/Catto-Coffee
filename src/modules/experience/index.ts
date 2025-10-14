@@ -3,8 +3,8 @@
  * @author Catto Bot Team
  */
 
-export { TextExperienceService } from './TextExperienceService';
+export { TextExperienceService } from './text/TextExperienceService';
 export { ExperienceCacheService } from './ExperienceCacheService';
 export { ExperienceCalculator } from './ExperienceCalculator';
-export { MessageExperienceHandler } from './MessageExperienceHandler';
+export { MessageExperienceHandler } from './text/MessageExperienceHandler';
 export * from './types';
