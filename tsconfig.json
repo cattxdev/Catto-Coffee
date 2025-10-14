@@ -1,16 +1,27 @@
 {
-	"extends": [
-		"@sapphire/ts-config",
-		"@sapphire/ts-config/extra-strict",
-		"@sapphire/ts-config/decorators"
-	],
-	"compilerOptions": {
-		"rootDir": "src",
-		"outDir": "dist",
-		"tsBuildInfoFile": "dist/.tsbuildinfo",
-	},
-	"include": [
-		"src",
-		"src/**/*.json"
-	]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "__tests__"],
+  "exclude": ["node_modules", "dist"]
 }

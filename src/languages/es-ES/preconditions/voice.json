@@ -1,4 +1,0 @@
-{
-    "guildvoice_error": "Solo puedes utilizar este comando mientras estas en un canal de voz. {{emoji}}",
-    "channel_not_editable": "Este canal de voz no es editable {{emoji}}"
-}

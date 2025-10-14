@@ -1,4 +1,0 @@
-{
-    "bio_success": "Bio updated successfully {{emoji}}",
-    "bio_fail": "There was an error trying to update your bio, please try again. {emoji}}"
-}

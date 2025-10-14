@@ -1,5 +1,0 @@
-{
-    "user": "You are currently blacklisted from the bot commands. {{error}}",
-    "server": "This server is currently blacklisted from the bot commands. {{error}}",
-    "server_user": "You are blacklisted from this server and cannot use the bot commands. {{error}}"
-}

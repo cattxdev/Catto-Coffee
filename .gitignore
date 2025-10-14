@@ -1,29 +1,33 @@
-# Ignore a blackhole and the folder for development
+# Node modules
 node_modules/
-.vs/
-.idea/
-*.iml
-.env
-# Yarn files
-.yarn/install-state.gz
-.yarn/build-state.yml
 
-# Environment variables
-.DS_Store
-
+# Build output
 dist/
+build/
 
-
-# Ignore heapsnapshot and log files
-*.heapsnapshot
+# Logs
+logs/
 *.log
-
-# Ignore npm lockfiles file
-package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Environment variables
+.env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-src/.env
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo

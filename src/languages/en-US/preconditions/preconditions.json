@@ -1,4 +1,0 @@
-{
-    "voice_sysem_enabled": "{{emoji}} Looks like the voice channel system is not enabled. Please run `/voice setup`.",
-    "MISSING_ROLE": "{{emoji}} Looks like you don't have the required role to use this command, you're missing the following roles: {{roles}}"
-}

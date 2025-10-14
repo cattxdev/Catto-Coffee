@@ -1,7 +1,0 @@
-{
-    "voice_sysem_enabled": "{{emoji}} Parece que el sistema de canales de voz no está habilitado. Por favor, ejecuta `/manage set voices`.",
-    "MISSING_ROLE": "{{emoji}} Parece que no tienes el rol requerido para usar este comando, te faltan los siguientes roles: {{roles}}",
-    "module_disabled": "{{emoji}} Parece que el modulo está deshabilitado. Por favor, habilita el módulo de canales de voz en la configuración del servidor.",
-    "command_disabled": "{{emoji}} Parece que el comando {{command}} está deshabilitado.",
-    "premium_server_only": "{{emoji}} Este comando solo está disponible para servidores premium."
-}

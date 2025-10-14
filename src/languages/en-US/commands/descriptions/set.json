@@ -1,8 +1,0 @@
-{
-    "set_description": "Configure your own profile",
-    "profile_description": "Set up your global profile!",
-    "profile_bio": "Set up your global bio",
-    "level": "Set an specific level to a user",
-    "level_text": "Set the text level of a user",
-    "level_voice": "Set the voice level of a user"
-}
