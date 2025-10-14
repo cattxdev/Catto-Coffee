@@ -17,15 +17,7 @@ module.exports = {
   verbose: true,
   transform: {
     '^.+\\.ts$': ['ts-jest', {
-      tsconfig: {
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        baseUrl: '.',
-        paths: {
-          '#/*': ['./src/*'],
-          '#/generated/*': ['./generated/*'],
-        },
-      }
+      tsconfig: '<rootDir>/tsconfig.test.json',
     }]
   },
 };

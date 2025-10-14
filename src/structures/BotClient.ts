@@ -12,6 +12,8 @@ import { ErrorHandler } from '../handlers/ErrorHandler';
 import { PreconditionManager } from '../preconditions/PreconditionManager';
 import { database } from '../services/DatabaseService';
 import { redis } from '../services/RedisService';
+import { initializeVoiceExperience, VoiceExperienceService } from '../modules/experience/voice';
+import { ExperienceRewardService } from '../modules/experience/services/ExperienceRewardService';
 import logger from '../utils/logger';
 import { Command, ButtonComponent, SelectMenuComponent, ModalComponent } from '../types';
 import type { PrismaClient } from '../../generated/prisma';
@@ -36,6 +38,7 @@ export class BotClient extends Client {
     public preconditionManager: PreconditionManager;
     public db: PrismaClient;
     public redis: RedisService;
+    public voiceExperience?: VoiceExperienceService;
 
     constructor() {
         super({
@@ -105,6 +108,17 @@ export class BotClient extends Client {
             await this.eventHandler.loadEvents();
             await this.componentHandler.loadComponents();
 
+            // Initialize voice experience module
+            logger.info('Initializing voice experience module...');
+            const rewardService = new ExperienceRewardService(this.db);
+            this.voiceExperience = initializeVoiceExperience(
+                this,
+                this.db,
+                redis.getClient(),
+                rewardService
+            );
+            logger.info('Voice experience module initialized');
+
             // Setup global error handlers
             this.errorHandler.setupGlobalHandlers();
 
@@ -123,6 +137,13 @@ export class BotClient extends Client {
      */
     async shutdown(): Promise<void> {
         logger.info('Shutting down bot...');
+        
+        // Cleanup voice experience module
+        if (this.voiceExperience) {
+            logger.info('Cleaning up voice experience module...');
+            // The service automatically cleans up periodic intervals
+            this.voiceExperience = undefined;
+        }
         
         // Disconnect from database
         await database.disconnect();

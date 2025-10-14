@@ -160,6 +160,20 @@ model Guild {
   isPremium        Boolean   @default(false) @map("is_premium")
   premiumExpiresAt DateTime? @map("premium_expires_at")
 
+  // Voice Experience Configuration
+  voiceExpEnabled         Boolean @default(true) @map("voice_exp_enabled")
+  voiceBaseExpPerMinute   Int     @default(5) @map("voice_base_exp_per_minute")
+  voiceMinMembers         Int     @default(2) @map("voice_min_members")
+  voicePeriodicInterval   Int     @default(300000) @map("voice_periodic_interval") // 5 minutes in ms
+  voiceMutedPenalty       Float   @default(0.5) @map("voice_muted_penalty")
+  voiceDeafenedPenalty    Float   @default(0.7) @map("voice_deafened_penalty")
+  voiceAfkPenalty         Float   @default(1.0) @map("voice_afk_penalty")
+  voiceStreamingBonus     Float   @default(0.2) @map("voice_streaming_bonus")
+  voiceVideoBonus         Float   @default(0.15) @map("voice_video_bonus")
+  voicePeakStartHour      Int?    @map("voice_peak_start_hour")
+  voicePeakEndHour        Int?    @map("voice_peak_end_hour")
+  voicePeakMultiplier     Float?  @map("voice_peak_multiplier")
+
   // Metadata
   memberCount Int       @default(0) @map("member_count")
   joinedAt    DateTime  @default(now()) @map("joined_at")
@@ -182,9 +196,10 @@ model Guild {
   leaderboardRewards    LeaderboardReward[]
 
   // Channels
-  channelConfigs    ChannelConfig[]
-  leaderboardConfig LeaderboardConfig?
-  tempVoiceConfigs  TempVoiceConfig[]
+  channelConfigs       ChannelConfig[]
+  voiceChannelConfigs  VoiceChannelConfig[]
+  leaderboardConfig    LeaderboardConfig?
+  tempVoiceConfigs     TempVoiceConfig[]
 
   // Commands & Permissions
   commandConfigs      CommandConfig[]
@@ -477,6 +492,27 @@ model ChannelConfig {
   @@unique([guildId, channelId])
   @@index([guildId])
   @@map("channel_configs")
+}
+
+model VoiceChannelConfig {
+  id        String @id @default(cuid())
+  guildId   String @map("guild_id")
+  channelId String @map("channel_id")
+
+  // Configuration
+  enabled       Boolean @default(true)
+  expMultiplier Float   @default(1.0) @map("exp_multiplier")
+  minMembers    Int?    @map("min_members")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, channelId])
+  @@index([guildId])
+  @@index([channelId])
+  @@map("voice_channel_configs")
 }
 
 model LeaderboardConfig {
