@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
+import { ExperienceCalculator } from '../../../src/modules/experience/ExperienceCalculator';
 
 describe('ExperienceCalculator', () => {
     describe('calculateLevel', () => {
@@ -54,7 +54,7 @@ describe('ExperienceCalculator', () => {
             const level1 = ExperienceCalculator.getXpRequiredForLevel(1);
             const level2 = ExperienceCalculator.getXpRequiredForLevel(2);
             const level3 = ExperienceCalculator.getXpRequiredForLevel(3);
-            
+
             expect(level2).toBeGreaterThan(level1);
             expect(level3).toBeGreaterThan(level2);
         });
@@ -105,7 +105,7 @@ describe('ExperienceCalculator', () => {
             const xpNeeded = level3Start - level2Start; // 300
             const halfway = level2Start + Math.floor(xpNeeded / 2); // 100 + 150 = 250
             const progress = ExperienceCalculator.calculateLevelProgress(halfway);
-            
+
             expect(progress).toBeGreaterThanOrEqual(45);
             expect(progress).toBeLessThanOrEqual(55);
         });
@@ -115,7 +115,7 @@ describe('ExperienceCalculator', () => {
         it('should generate XP within range', () => {
             const min = 10;
             const max = 20;
-            
+
             for (let i = 0; i < 100; i++) {
                 const xp = ExperienceCalculator.generateBaseXp(min, max);
                 expect(xp).toBeGreaterThanOrEqual(min);
@@ -132,11 +132,11 @@ describe('ExperienceCalculator', () => {
             const values = new Set<number>();
             const min = 10;
             const max = 30;
-            
+
             for (let i = 0; i < 50; i++) {
                 values.add(ExperienceCalculator.generateBaseXp(min, max));
             }
-            
+
             // Should have at least 5 different values in 50 generations
             expect(values.size).toBeGreaterThanOrEqual(5);
         });

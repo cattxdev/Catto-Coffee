@@ -4,10 +4,9 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { TextExperienceService } from '#/modules/experience/services/TextExperienceService';
-import type { PrismaClient } from '#/generated/prisma';
-import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
-import { ExperienceType } from '#/generated/prisma';
+import { PrismaClient } from '@prisma/client/edge';
+import { ExperienceCacheService } from '../../../../src/modules/experience/ExperienceCacheService';
+import { TextExperienceService } from '../../../../src/modules/experience/TextExperienceService';
 
 describe('TextExperienceService (Integration)', () => {
     let service: TextExperienceService;
@@ -34,7 +33,7 @@ describe('TextExperienceService (Integration)', () => {
                 upsert: jest.fn(),
                 update: jest.fn(),
             },
-            experienceReward: {
+            levelReward: {
                 findMany: jest.fn(),
             },
             auditLog: {
@@ -44,19 +43,18 @@ describe('TextExperienceService (Integration)', () => {
 
         // Mock Cache
         mockCache = {
-            getCachedConfig: jest.fn(),
-            cacheConfig: jest.fn(),
+            getConfig: jest.fn(),
+            setConfig: jest.fn(),
             invalidateConfig: jest.fn(),
-            getCachedMultipliers: jest.fn(),
-            cacheMultipliers: jest.fn(),
+            getMultipliers: jest.fn(),
+            setMultipliers: jest.fn(),
             invalidateMultipliers: jest.fn(),
             isOnCooldown: jest.fn(),
             setCooldown: jest.fn(),
             getCooldownTTL: jest.fn(),
             clearCooldown: jest.fn(),
-            clearAllCooldowns: jest.fn(),
-            getCachedUserLevel: jest.fn(),
-            cacheUserLevel: jest.fn(),
+            getUserLevel: jest.fn(),
+            setUserLevel: jest.fn(),
             invalidateUserLevel: jest.fn(),
         } as any;
 
@@ -65,14 +63,16 @@ describe('TextExperienceService (Integration)', () => {
 
     describe('awardExperience', () => {
         it('should return null if experience is disabled', async () => {
-            mockCache.getCachedConfig.mockResolvedValue(
-                JSON.stringify({
-                    enabled: false,
-                    minXp: 15,
-                    maxXp: 25,
-                    cooldownSeconds: 60,
-                })
-            );
+            mockCache.getConfig.mockResolvedValue({
+                enabled: false,
+                minXp: 15,
+                maxXp: 25,
+                cooldownSeconds: 60,
+                type: 'TEXT' as any,
+                announcementChannelId: null,
+                sendLevelUpMessages: true,
+                cachedAt: Date.now(),
+            });
 
             const result = await service.awardExperience('user-123', 'guild-456');
 
@@ -81,14 +81,16 @@ describe('TextExperienceService (Integration)', () => {
         });
 
         it('should return null if user is on cooldown', async () => {
-            mockCache.getCachedConfig.mockResolvedValue(
-                JSON.stringify({
-                    enabled: true,
-                    minXp: 15,
-                    maxXp: 25,
-                    cooldownSeconds: 60,
-                })
-            );
+            mockCache.getConfig.mockResolvedValue({
+                enabled: true,
+                minXp: 15,
+                maxXp: 25,
+                cooldownSeconds: 60,
+                type: 'TEXT' as any,
+                announcementChannelId: null,
+                sendLevelUpMessages: true,
+                cachedAt: Date.now(),
+            });
             mockCache.isOnCooldown.mockResolvedValue(true);
 
             const result = await service.awardExperience('user-123', 'guild-456');
@@ -98,16 +100,18 @@ describe('TextExperienceService (Integration)', () => {
 
         it('should award experience and handle level up', async () => {
             // Setup mocks
-            mockCache.getCachedConfig.mockResolvedValue(
-                JSON.stringify({
-                    enabled: true,
-                    minXp: 15,
-                    maxXp: 25,
-                    cooldownSeconds: 60,
-                })
-            );
+            mockCache.getConfig.mockResolvedValue({
+                enabled: true,
+                minXp: 15,
+                maxXp: 25,
+                cooldownSeconds: 60,
+                type: 'TEXT' as any,
+                announcementChannelId: null,
+                sendLevelUpMessages: true,
+                cachedAt: Date.now(),
+            });
             mockCache.isOnCooldown.mockResolvedValue(false);
-            mockCache.getCachedMultipliers.mockResolvedValue(JSON.stringify([]));
+            mockCache.getMultipliers.mockResolvedValue([]);
 
             const mockUser = {
                 id: 1,
@@ -131,7 +135,7 @@ describe('TextExperienceService (Integration)', () => {
                 userId: 1,
                 guildId: 2,
                 textTotalXp: 80,
-                textLevel: 0,
+                textLevel: 1,
                 voiceTotalMinutes: 0,
                 voiceLevel: 0,
                 textMessagesToday: 0,
@@ -147,8 +151,8 @@ describe('TextExperienceService (Integration)', () => {
 
             const updatedMember = {
                 ...mockMember,
-                textTotalXp: 105, // 80 + ~25 XP = level up to 1
-                textLevel: 1,
+                textTotalXp: 105, // 80 + ~25 XP = level up to 2
+                textLevel: 2,
                 textMessagesToday: 1,
                 textMessagesWeek: 1,
                 textMessagesMonth: 1,
@@ -159,7 +163,7 @@ describe('TextExperienceService (Integration)', () => {
             mockPrisma.guildMember.upsert.mockResolvedValue(mockMember as any);
             mockPrisma.guildMember.update.mockResolvedValue(updatedMember as any);
             mockPrisma.user.update.mockResolvedValue({} as any);
-            mockPrisma.experienceReward.findMany.mockResolvedValue([
+            mockPrisma.levelReward.findMany.mockResolvedValue([
                 {
                     id: 1,
                     guildId: 2,
@@ -176,24 +180,26 @@ describe('TextExperienceService (Integration)', () => {
 
             expect(result).not.toBeNull();
             expect(result?.levelUp.leveledUp).toBe(true);
-            expect(result?.levelUp.oldLevel).toBe(0);
-            expect(result?.levelUp.newLevel).toBe(1);
+            expect(result?.levelUp.oldLevel).toBe(1);
+            expect(result?.levelUp.newLevel).toBe(2);
             expect(result?.levelUp.rewards).toContain('role-789');
             expect(mockCache.setCooldown).toHaveBeenCalledWith('guild-456', 'user-123', 60);
             expect(mockCache.invalidateUserLevel).toHaveBeenCalled();
         });
 
         it('should award experience without level up', async () => {
-            mockCache.getCachedConfig.mockResolvedValue(
-                JSON.stringify({
-                    enabled: true,
-                    minXp: 15,
-                    maxXp: 25,
-                    cooldownSeconds: 60,
-                })
-            );
+            mockCache.getConfig.mockResolvedValue({
+                enabled: true,
+                minXp: 15,
+                maxXp: 25,
+                cooldownSeconds: 60,
+                type: 'TEXT' as any,
+                announcementChannelId: null,
+                sendLevelUpMessages: true,
+                cachedAt: Date.now(),
+            });
             mockCache.isOnCooldown.mockResolvedValue(false);
-            mockCache.getCachedMultipliers.mockResolvedValue(JSON.stringify([]));
+            mockCache.getMultipliers.mockResolvedValue([]);
 
             const mockUser = {
                 id: 1,
@@ -217,7 +223,7 @@ describe('TextExperienceService (Integration)', () => {
                 userId: 1,
                 guildId: 2,
                 textTotalXp: 50,
-                textLevel: 0,
+                textLevel: 1,
                 voiceTotalMinutes: 0,
                 voiceLevel: 0,
                 textMessagesToday: 0,
@@ -234,7 +240,7 @@ describe('TextExperienceService (Integration)', () => {
             const updatedMember = {
                 ...mockMember,
                 textTotalXp: 70,
-                textLevel: 0,
+                textLevel: 1,
                 textMessagesToday: 1,
                 textMessagesWeek: 1,
                 textMessagesMonth: 1,
@@ -280,14 +286,16 @@ describe('TextExperienceService (Integration)', () => {
 
     describe('getConfig', () => {
         it('should delegate to config service', async () => {
-            mockCache.getCachedConfig.mockResolvedValue(
-                JSON.stringify({
-                    enabled: true,
-                    minXp: 15,
-                    maxXp: 25,
-                    cooldownSeconds: 60,
-                })
-            );
+            mockCache.getConfig.mockResolvedValue({
+                enabled: true,
+                minXp: 15,
+                maxXp: 25,
+                cooldownSeconds: 60,
+                type: 'TEXT' as any,
+                announcementChannelId: null,
+                sendLevelUpMessages: true,
+                cachedAt: Date.now(),
+            });
 
             const result = await service.getConfig('guild-456');
 

@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { UserManagementService } from '#/modules/experience/services/UserManagementService';
-import type { PrismaClient } from '#/generated/prisma';
+import { UserManagementService } from '../../../../src/modules/experience/services/UserManagementService';
+import { PrismaClient } from '@prisma/client';
 
 describe('UserManagementService', () => {
     let service: UserManagementService;
@@ -29,87 +29,58 @@ describe('UserManagementService', () => {
         service = new UserManagementService(mockPrisma);
     });
 
-    describe('upsertUser', () => {
-        it('should create user if not exists', async () => {
-            const mockUser = {
-                id: 1,
-                discordId: 'user-123',
-                globalTextXp: 0,
-                globalVoiceMinutes: 0,
-                totalTextMessages: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            mockPrisma.user.upsert.mockResolvedValue(mockUser as any);
-
-            const result = await service.upsertUser('user-123');
-
-            expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
-                where: { discordId: 'user-123' },
-                create: { discordId: 'user-123' },
-                update: {},
-            });
-            expect(result).toEqual(mockUser);
-        });
-    });
-
-    describe('upsertGuild', () => {
-        it('should create guild if not exists', async () => {
-            const mockGuild = {
-                id: 1,
-                discordId: 'guild-456',
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
-
-            mockPrisma.guild.upsert.mockResolvedValue(mockGuild as any);
-
-            const result = await service.upsertGuild('guild-456');
-
-            expect(mockPrisma.guild.upsert).toHaveBeenCalledWith({
-                where: { discordId: 'guild-456' },
-                create: { discordId: 'guild-456' },
-                update: {},
-            });
-            expect(result).toEqual(mockGuild);
-        });
-    });
-
     describe('ensureUserAndGuild', () => {
         it('should create user, guild, and member', async () => {
             const mockUser = {
-                id: 1,
+                id: '1',
                 discordId: 'user-123',
-                globalTextXp: 0,
-                globalVoiceMinutes: 0,
-                totalTextMessages: 0,
+                globalExperience: 0,
+                globalLevel: 1,
+                totalMessagesCount: 0,
+                totalVoiceTimeSeconds: 0,
+                bio: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
+                lastSeenAt: null,
             };
 
             const mockGuild = {
-                id: 2,
+                id: '2',
                 discordId: 'guild-456',
+                name: 'Test Guild',
+                prefix: null,
+                locale: 'en',
+                timezone: 'UTC',
+                isPremium: false,
+                premiumExpiresAt: null,
+                memberCount: 0,
+                joinedAt: new Date(),
+                leftAt: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
 
             const mockMember = {
-                id: 3,
-                userId: 1,
-                guildId: 2,
+                id: '3',
+                userId: '1',
+                guildId: '2',
+                userDiscordId: 'user-123',
+                textXp: 0,
+                textLevel: 1,
                 textTotalXp: 0,
-                textLevel: 0,
-                voiceTotalMinutes: 0,
-                voiceLevel: 0,
-                textMessagesToday: 0,
-                textMessagesWeek: 0,
-                textMessagesMonth: 0,
-                voiceMinutesToday: 0,
-                voiceMinutesWeek: 0,
-                voiceMinutesMonth: 0,
-                joinedAt: new Date(),
+                textMessageCount: 0,
+                voiceXp: 0,
+                voiceLevel: 1,
+                voiceTotalXp: 0,
+                voiceTimeSeconds: 0,
+                dailyTextMessages: 0,
+                weeklyTextMessages: 0,
+                monthlyTextMessages: 0,
+                dailyVoiceSeconds: 0,
+                weeklyVoiceSeconds: 0,
+                monthlyVoiceSeconds: 0,
+                lastMessageAt: null,
+                lastVoiceAt: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
@@ -127,14 +98,15 @@ describe('UserManagementService', () => {
     });
 
     describe('updateGlobalStats', () => {
-        it('should increment global XP and message count', async () => {
-            await service.updateGlobalStats(1, 50);
+        it('should increment global experience and message count', async () => {
+            await service.updateGlobalStats('1', 50);
 
             expect(mockPrisma.user.update).toHaveBeenCalledWith({
-                where: { id: 1 },
+                where: { id: '1' },
                 data: {
-                    globalTextXp: { increment: 50 },
-                    totalTextMessages: { increment: 1 },
+                    globalExperience: { increment: 50 },
+                    totalMessagesCount: { increment: 1 },
+                    lastSeenAt: expect.any(Date),
                 },
             });
         });
@@ -143,41 +115,49 @@ describe('UserManagementService', () => {
     describe('updateMemberExperience', () => {
         it('should update member XP, level, and message counts', async () => {
             const mockUpdatedMember = {
-                id: 3,
-                userId: 1,
-                guildId: 2,
+                id: '3',
+                userId: '1',
+                guildId: '2',
+                userDiscordId: 'user-123',
+                textXp: 50,
                 textTotalXp: 150,
                 textLevel: 2,
-                textMessagesToday: 1,
-                textMessagesWeek: 1,
-                textMessagesMonth: 1,
-                voiceTotalMinutes: 0,
-                voiceLevel: 0,
-                voiceMinutesToday: 0,
-                voiceMinutesWeek: 0,
-                voiceMinutesMonth: 0,
-                joinedAt: new Date(),
+                textMessageCount: 1,
+                dailyTextMessages: 1,
+                weeklyTextMessages: 1,
+                monthlyTextMessages: 1,
+                voiceXp: 0,
+                voiceLevel: 1,
+                voiceTotalXp: 0,
+                voiceTimeSeconds: 0,
+                dailyVoiceSeconds: 0,
+                weeklyVoiceSeconds: 0,
+                monthlyVoiceSeconds: 0,
+                lastMessageAt: new Date(),
+                lastVoiceAt: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
 
             mockPrisma.guildMember.update.mockResolvedValue(mockUpdatedMember as any);
 
-            const result = await service.updateMemberExperience(2, 'user-123', 50, 150, 2);
+            const result = await service.updateMemberExperience('2', 'user-123', 50, 150, 2);
 
             expect(mockPrisma.guildMember.update).toHaveBeenCalledWith({
                 where: {
-                    guildId_user_discordId: {
-                        guildId: 2,
-                        user_discordId: 'user-123',
+                    guildId_userDiscordId: {
+                        guildId: '2',
+                        userDiscordId: 'user-123',
                     },
                 },
                 data: {
+                    textXp: 50,
                     textTotalXp: 150,
                     textLevel: 2,
-                    textMessagesToday: { increment: 1 },
-                    textMessagesWeek: { increment: 1 },
-                    textMessagesMonth: { increment: 1 },
+                    textMessageCount: { increment: 1 },
+                    dailyTextMessages: { increment: 1 },
+                    weeklyTextMessages: { increment: 1 },
+                    monthlyTextMessages: { increment: 1 },
                 },
             });
             expect(result).toEqual(mockUpdatedMember);
