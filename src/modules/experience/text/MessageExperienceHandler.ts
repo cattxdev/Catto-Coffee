@@ -145,7 +145,7 @@ export class MessageExperienceHandler {
     private async buildCustomLevelUpMessage(message: Message, result: any): Promise<string | null> {
         try {
             // Get the full config from database to access announceMessage
-            const dbConfig = await this.experienceService['prisma'].experienceConfig.findFirst({
+            const dbConfig = await this.experienceService.prismaClient.experienceConfig.findFirst({
                 where: {
                     guild: { discordId: message.guild!.id },
                     type: 'TEXT'

@@ -1,40 +1,51 @@
 /**
- * @fileoverview Text Experience Service
+ * @fileoverview Refactored Text Experience Service (Orchestrator)
  * @author Catto Bot Team
  */
 
-import type { PrismaClient } from '../../../../generated/prisma';
-import { ExperienceType, AuditLogAction } from '../../../../generated/prisma';
-import logger from '../../../utils/logger';
-import { ExperienceCacheService } from '../ExperienceCacheService';
-import { ExperienceCalculator } from '../ExperienceCalculator';
+import type { PrismaClient } from '#/generated/prisma';
+import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
+import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
+import { ExperienceConfigService } from '../services/ExperienceConfigService';
+import { ExperienceMultiplierService } from '../services/ExperienceMultiplierService';
+import { ExperienceRewardService } from '../services/ExperienceRewardService';
+import { UserManagementService } from '../services/UserManagementService';
 import {
     type ExperienceCalculation,
     type ExperienceGainResult,
     type CooldownResult,
-    type ExperienceConfigCache,
-    type LeaderboardEntry,
-    type LeaderboardOptions,
-    type ExperienceStats,
     type AppliedMultiplier,
-} from '../types';
+} from '#/modules/experience/types';
+import logger from '#/utils/logger';
 
 /**
- * Text Experience Service
- * Orchestrates experience operations using calculator and cache services
+ * Text Experience Service (Orchestrator)
+ * Coordinates smaller services to handle experience operations
  */
 export class TextExperienceService {
+    private readonly configService: ExperienceConfigService;
+    private readonly multiplierService: ExperienceMultiplierService;
+    private readonly rewardService: ExperienceRewardService;
+    private readonly userService: UserManagementService;
+
     constructor(
         private readonly prisma: PrismaClient,
         private readonly cache: ExperienceCacheService
-    ) { }
+    ) {
+        // Initialize sub-services
+        this.configService = new ExperienceConfigService(prisma, cache);
+        this.multiplierService = new ExperienceMultiplierService(prisma, cache);
+        this.rewardService = new ExperienceRewardService(prisma);
+        this.userService = new UserManagementService(prisma);
+    }
 
     // ============================================================================
-    // CORE EXPERIENCE METHODS
+    // CORE EXPERIENCE AWARDING
     // ============================================================================
 
     /**
      * Award experience to a user for sending a message
+     * 
      * @param userId - Discord user ID
      * @param guildId - Discord guild ID
      * @returns Experience gain result or null if XP disabled/on cooldown
@@ -45,7 +56,7 @@ export class TextExperienceService {
     ): Promise<ExperienceGainResult | null> {
         try {
             // 1. Check if experience is enabled
-            const config = await this.getConfig(guildId);
+            const config = await this.configService.getConfig(guildId);
             if (!config.enabled) {
                 return null;
             }
@@ -65,42 +76,28 @@ export class TextExperienceService {
             );
 
             // 4. Get or create user and guild member
-            const { user, guild, member } = await this.ensureUserAndGuild(userId, guildId);
+            const { user, guild, member } = await this.userService.ensureUserAndGuild(
+                userId,
+                guildId
+            );
 
-            // 5. Update XP and check for level up
+            // 5. Calculate new level
             const oldLevel = member.textLevel;
             const newTotalXp = member.textTotalXp + calculation.finalXp;
             const newLevel = ExperienceCalculator.calculateLevel(newTotalXp);
             const leveledUp = newLevel > oldLevel;
 
             // 6. Update database
-            const updatedMember = await this.prisma.guildMember.update({
-                where: {
-                    guildId_userDiscordId: {
-                        guildId: guild.id,
-                        userDiscordId: user.discordId,
-                    },
-                },
-                data: {
-                    textXp: calculation.finalXp,
-                    textTotalXp: newTotalXp,
-                    textLevel: newLevel,
-                    textMessageCount: { increment: 1 },
-                    dailyTextMessages: { increment: 1 },
-                    weeklyTextMessages: { increment: 1 },
-                    monthlyTextMessages: { increment: 1 },
-                },
-            });
+            const updatedMember = await this.userService.updateMemberExperience(
+                guild.id,
+                user.discordId,
+                calculation.finalXp,
+                newTotalXp,
+                newLevel
+            );
 
             // 7. Update global user stats
-            await this.prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    globalExperience: { increment: calculation.finalXp },
-                    totalMessagesCount: { increment: 1 },
-                    lastSeenAt: new Date(),
-                },
-            });
+            await this.userService.updateGlobalStats(user.id, calculation.finalXp);
 
             // 8. Set cooldown
             await this.cache.setCooldown(guildId, userId, config.cooldownSeconds);
@@ -108,7 +105,7 @@ export class TextExperienceService {
             // 9. Handle level up rewards
             const rewards: string[] = [];
             if (leveledUp) {
-                const levelRewards = await this.handleLevelUp(
+                const levelRewards = await this.rewardService.handleLevelUp(
                     user.discordId,
                     guild.id,
                     oldLevel,
@@ -131,7 +128,9 @@ export class TextExperienceService {
                 },
                 totalXp: updatedMember.textTotalXp,
                 currentLevel: updatedMember.textLevel,
-                currentLevelXp: ExperienceCalculator.getXpForCurrentLevel(updatedMember.textTotalXp),
+                currentLevelXp: ExperienceCalculator.getXpForCurrentLevel(
+                    updatedMember.textTotalXp
+                ),
                 xpForNextLevel: ExperienceCalculator.getXpRequiredForLevel(newLevel + 1),
             };
         } catch (error) {
@@ -146,14 +145,14 @@ export class TextExperienceService {
     private async calculateExperience(
         minXp: number,
         maxXp: number,
-        userId: string,
+        _userId: string,
         guildId: string
     ): Promise<ExperienceCalculation> {
         // Generate random base XP
         const baseXp = ExperienceCalculator.generateBaseXp(minXp, maxXp);
 
         // Get active multipliers
-        const multipliers = await this.getActiveMultipliers(userId, guildId);
+        const multipliers = await this.multiplierService.getActiveMultipliers(guildId);
 
         // Calculate total multiplier
         let totalMultiplier = 1.0;
@@ -211,369 +210,34 @@ export class TextExperienceService {
     }
 
     // ============================================================================
-    // CONFIG METHODS
+    // PUBLIC API - Delegate to sub-services
     // ============================================================================
 
     /**
-     * Get experience configuration (with caching)
+     * Get experience configuration
      */
-    async getConfig(guildId: string): Promise<ExperienceConfigCache> {
-        // Try cache first
-        const cached = await this.cache.getConfig(guildId);
-        if (cached) {
-            return cached;
-        }
-
-        // Get from database
-        const guild = await this.prisma.guild.findUnique({
-            where: { discordId: guildId },
-            include: {
-                experienceConfigs: {
-                    where: { type: ExperienceType.TEXT },
-                },
-            },
-        });
-
-        if (!guild || guild.experienceConfigs.length === 0) {
-            // Return default config
-            const defaultConfig: ExperienceConfigCache = {
-                enabled: true,
-                minXp: 15,
-                maxXp: 25,
-                cooldownSeconds: 60,
-                type: ExperienceType.TEXT,
-                announcementChannelId: null,
-                sendLevelUpMessages: true,
-                cachedAt: Date.now(),
-            };
-
-            // Cache for shorter time since it's default
-            await this.cache.setConfig(guildId, defaultConfig, 60);
-            return defaultConfig;
-        }
-
-        const config = guild.experienceConfigs[0];
-        const configCache: ExperienceConfigCache = {
-            enabled: config.isEnabled,
-            minXp: config.minXp,
-            maxXp: config.maxXp,
-            cooldownSeconds: config.cooldownSeconds,
-            type: config.type,
-            announcementChannelId: config.announceChannelId,
-            sendLevelUpMessages: config.announceLevel,
-            cachedAt: Date.now(),
-        };
-
-        // Cache config
-        await this.cache.setConfig(guildId, configCache);
-        return configCache;
+    async getConfig(guildId: string) {
+        return await this.configService.getConfig(guildId);
     }
 
     /**
-     * Invalidate config cache
+     * Invalidate configuration cache
      */
     async invalidateConfigCache(guildId: string): Promise<void> {
-        await this.cache.invalidateConfig(guildId);
-    }
-
-    // ============================================================================
-    // MULTIPLIER METHODS
-    // ============================================================================
-
-    /**
-     * Get active multipliers for guild (with caching)
-     */
-    private async getActiveMultipliers(_userId: string, guildId: string) {
-        // Try cache first
-        const cached = await this.cache.getMultipliers(guildId);
-        if (cached) {
-            return cached;
-        }
-
-        // Get from database
-        const guild = await this.prisma.guild.findUnique({
-            where: { discordId: guildId },
-        });
-
-        if (!guild) {
-            return [];
-        }
-
-        const now = new Date();
-        const multipliers = await this.prisma.experienceMultiplier.findMany({
-            where: {
-                guildId: guild.id,
-                OR: [
-                    { expiresAt: null },
-                    { expiresAt: { gt: now } },
-                ],
-            },
-        });
-
-        // Cache multipliers
-        await this.cache.setMultipliers(guildId, multipliers);
-        return multipliers;
+        await this.configService.invalidateCache(guildId);
     }
 
     /**
      * Invalidate multipliers cache
      */
     async invalidateMultipliersCache(guildId: string): Promise<void> {
-        await this.cache.invalidateMultipliers(guildId);
-    }
-
-
-
-    // ============================================================================
-    // USER/GUILD MANAGEMENT
-    // ============================================================================
-
-    /**
-     * Ensure user and guild exist in database
-     */
-    private async ensureUserAndGuild(userId: string, guildId: string) {
-        // Upsert user
-        const user = await this.prisma.user.upsert({
-            where: { discordId: userId },
-            create: {
-                discordId: userId,
-                globalExperience: 0,
-                globalLevel: 1,
-                totalMessagesCount: 0,
-                totalVoiceTimeSeconds: 0,
-            },
-            update: {},
-        });
-
-        // Upsert guild
-        const guild = await this.prisma.guild.upsert({
-            where: { discordId: guildId },
-            create: {
-                discordId: guildId,
-                name: 'Unknown',
-                isPremium: false,
-            },
-            update: {},
-        });
-
-        // Upsert guild member
-        const member = await this.prisma.guildMember.upsert({
-            where: {
-                guildId_userDiscordId: {
-                    guildId: guild.id,
-                    userDiscordId: user.discordId,
-                },
-            },
-            create: {
-                guildId: guild.id,
-                userId: user.id,
-                userDiscordId: user.discordId,
-                textXp: 0,
-                textLevel: 1,
-                textTotalXp: 0,
-                textMessageCount: 0,
-            },
-            update: {},
-        });
-
-        return { user, guild, member };
-    }
-
-    // ============================================================================
-    // LEVEL UP & REWARDS
-    // ============================================================================
-
-    /**
-     * Handle level up rewards
-     */
-    private async handleLevelUp(
-        userDiscordId: string,
-        guildDbId: string,
-        oldLevel: number,
-        newLevel: number
-    ): Promise<string[]> {
-        const rewards: string[] = [];
-
-        // Get rewards for levels between old and new
-        const levelRewards = await this.prisma.levelReward.findMany({
-            where: {
-                guildId: guildDbId,
-                level: {
-                    gt: oldLevel,
-                    lte: newLevel,
-                },
-            },
-            orderBy: { level: 'asc' },
-        });
-
-        for (const reward of levelRewards) {
-            rewards.push(reward.roleId);
-
-            // Create audit log
-            await this.prisma.auditLog.create({
-                data: {
-                    guildId: guildDbId,
-                    userId: userDiscordId,
-                    action: AuditLogAction.ROLE_REWARDED,
-                    metadata: {
-                        level: reward.level,
-                        roleId: reward.roleId,
-                    },
-                },
-            }).catch(() => {
-                // Ignore audit log errors
-            });
-        }
-
-        return rewards;
-    }
-
-    // ============================================================================
-    // LEADERBOARD METHODS
-    // ============================================================================
-
-    /**
-     * Get leaderboard (with caching)
-     */
-    async getLeaderboard(
-        options: LeaderboardOptions
-    ): Promise<LeaderboardEntry[]> {
-        const { guildId, period = 'ALL_TIME', limit = 10, offset = 0 } = options;
-
-        // Try cache first
-        const cached = await this.cache.getLeaderboard(guildId, period, limit, offset);
-        if (cached) {
-            return cached;
-        }
-
-        // Get from database
-        const guild = await this.prisma.guild.findUnique({
-            where: { discordId: guildId },
-        });
-
-        if (!guild) {
-            return [];
-        }
-
-        // Build query based on period
-        const orderBy = this.getLeaderboardOrderBy(period);
-
-        const members = await this.prisma.guildMember.findMany({
-            where: { guildId: guild.id },
-            orderBy,
-            take: limit,
-            skip: offset,
-            include: {
-                user: {
-                    select: {
-                        discordId: true,
-                    },
-                },
-            },
-        });
-
-        // Format results
-        const entries: LeaderboardEntry[] = members.map((member, index) => ({
-            id: member.id,
-            discordId: member.user.discordId,
-            totalXp: member.textTotalXp,
-            level: member.textLevel,
-            rank: offset + index + 1,
-            messageCount: this.getMessageCountForPeriod(member, period),
-        }));
-
-        // Cache leaderboard
-        await this.cache.setLeaderboard(guildId, period, limit, offset, entries);
-
-        return entries;
+        await this.multiplierService.invalidateCache(guildId);
     }
 
     /**
-     * Get order by clause for leaderboard query
+     * Get database client (for direct access from MessageExperienceHandler)
      */
-    private getLeaderboardOrderBy(period: string) {
-        switch (period) {
-            case 'DAILY':
-                return { dailyTextMessages: 'desc' as const };
-            case 'WEEKLY':
-                return { weeklyTextMessages: 'desc' as const };
-            case 'MONTHLY':
-                return { monthlyTextMessages: 'desc' as const };
-            default:
-                return { textTotalXp: 'desc' as const };
-        }
-    }
-
-    /**
-     * Get message count for period
-     */
-    private getMessageCountForPeriod(member: any, period: string): number {
-        switch (period) {
-            case 'DAILY':
-                return member.dailyTextMessages;
-            case 'WEEKLY':
-                return member.weeklyTextMessages;
-            case 'MONTHLY':
-                return member.monthlyTextMessages;
-            default:
-                return member.textMessageCount;
-        }
-    }
-
-    /**
-     * Invalidate leaderboard cache
-     */
-    async invalidateLeaderboardCache(guildId: string): Promise<void> {
-        await this.cache.invalidateLeaderboard(guildId);
-    }
-
-    // ============================================================================
-    // STATS METHODS
-    // ============================================================================
-
-    /**
-     * Get user experience statistics
-     */
-    async getUserStats(userId: string, guildId: string): Promise<ExperienceStats | null> {
-        const { guild, member } = await this.getUserAndGuild(userId, guildId);
-
-        if (!guild || !member) {
-            return null;
-        }
-
-        return {
-            totalXp: member.textTotalXp,
-            level: member.textLevel,
-            totalMessages: member.textMessageCount,
-            dailyMessages: member.dailyTextMessages,
-            weeklyMessages: member.weeklyTextMessages,
-            monthlyMessages: member.monthlyTextMessages,
-            xpToNextLevel: ExperienceCalculator.getXpForNextLevel(member.textTotalXp),
-            levelProgress: ExperienceCalculator.calculateLevelProgress(member.textTotalXp),
-        };
-    }
-
-    /**
-     * Get user and guild (helper method)
-     */
-    private async getUserAndGuild(userId: string, guildId: string) {
-        const guild = await this.prisma.guild.findUnique({
-            where: { discordId: guildId },
-        });
-
-        if (!guild) {
-            return { guild: null, member: null };
-        }
-
-        const member = await this.prisma.guildMember.findUnique({
-            where: {
-                guildId_userDiscordId: {
-                    guildId: guild.id,
-                    userDiscordId: userId,
-                },
-            },
-        });
-
-        return { guild, member };
+    get prismaClient(): PrismaClient {
+        return this.prisma;
     }
 }

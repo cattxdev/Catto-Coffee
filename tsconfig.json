@@ -8,7 +8,8 @@
     "outDir": "./dist",
     "baseUrl": "./src",
     "paths": {
-      "#/*": ["./*"]
+      "#/*": ["./*"],
+      "#/generated/*": ["../generated/*"]
     },
     "strict": true,
     "esModuleInterop": true,
