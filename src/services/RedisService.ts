@@ -456,6 +456,136 @@ class RedisService {
     public async srem(key: string, member: string): Promise<number> {
         return await this.redis.srem(key, member);
     }
+
+    // ============================================================================
+    // SORTED SET (ZSET) OPERATIONS
+    // ============================================================================
+
+    /**
+     * Sorted set add - add member with score
+     * @param key - The sorted set key
+     * @param scoreOrMembers - Score and member pairs (...[score, member, score, member])
+     */
+    public async zadd(key: string, ...scoreOrMembers: Array<number | string>): Promise<number> {
+        return await this.redis.zadd(key, ...scoreOrMembers);
+    }
+
+    /**
+     * Sorted set increment - increment member's score
+     * @param key - The sorted set key
+     * @param increment - Amount to increment
+     * @param member - The member
+     */
+    public async zincrby(key: string, increment: number, member: string): Promise<number> {
+        const result = await this.redis.zincrby(key, increment, member);
+        return parseFloat(result);
+    }
+
+    /**
+     * Sorted set score - get member's score
+     * @param key - The sorted set key
+     * @param member - The member
+     */
+    public async zscore(key: string, member: string): Promise<number | null> {
+        const score = await this.redis.zscore(key, member);
+        return score !== null ? parseFloat(score) : null;
+    }
+
+    /**
+     * Sorted set reverse rank - get member's rank (highest score = rank 0)
+     * @param key - The sorted set key
+     * @param member - The member
+     */
+    public async zrevrank(key: string, member: string): Promise<number | null> {
+        return await this.redis.zrevrank(key, member);
+    }
+
+    /**
+     * Sorted set reverse range - get members by rank (highest to lowest)
+     * @param key - The sorted set key
+     * @param start - Start index
+     * @param stop - Stop index
+     * @param withScores - Whether to include scores
+     */
+    public async zrevrange(
+        key: string,
+        start: number,
+        stop: number,
+        withScores: boolean = false
+    ): Promise<string[]> {
+        if (withScores) {
+            return await this.redis.zrevrange(key, start, stop, 'WITHSCORES');
+        }
+        return await this.redis.zrevrange(key, start, stop);
+    }
+
+    /**
+     * Sorted set reverse range by score - get members by score range
+     * @param key - The sorted set key
+     * @param max - Maximum score
+     * @param min - Minimum score
+     * @param withScores - Whether to include scores
+     * @param limit - Limit options {offset, count}
+     */
+    public async zrevrangebyscore(
+        key: string,
+        max: number | string,
+        min: number | string,
+        withScores: boolean = false,
+        limit?: { offset: number; count: number }
+    ): Promise<string[]> {
+        if (withScores && limit) {
+            return await this.redis.zrevrangebyscore(
+                key,
+                max,
+                min,
+                'WITHSCORES',
+                'LIMIT',
+                limit.offset,
+                limit.count
+            );
+        } else if (withScores) {
+            return await this.redis.zrevrangebyscore(key, max, min, 'WITHSCORES');
+        } else if (limit) {
+            return await this.redis.zrevrangebyscore(
+                key,
+                max,
+                min,
+                'LIMIT',
+                limit.offset,
+                limit.count
+            );
+        } else {
+            return await this.redis.zrevrangebyscore(key, max, min);
+        }
+    }
+
+    /**
+     * Sorted set cardinality - get number of members
+     * @param key - The sorted set key
+     */
+    public async zcard(key: string): Promise<number> {
+        return await this.redis.zcard(key);
+    }
+
+    /**
+     * Sorted set remove - remove member
+     * @param key - The sorted set key
+     * @param member - The member to remove
+     */
+    public async zrem(key: string, member: string): Promise<number> {
+        return await this.redis.zrem(key, member);
+    }
+
+    /**
+     * Sorted set count - count members in score range
+     * @param key - The sorted set key
+     * @param min - Minimum score
+     * @param max - Maximum score
+     */
+    public async zcount(key: string, min: number | string, max: number | string): Promise<number> {
+        return await this.redis.zcount(key, min, max);
+    }
 }
 
 // Export singleton instance

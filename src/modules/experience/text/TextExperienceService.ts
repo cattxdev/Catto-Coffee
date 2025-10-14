@@ -5,12 +5,14 @@
 
 import type { PrismaClient } from '#/generated/prisma';
 import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
+import { ExperienceRankingService } from '#/modules/experience/ExperienceRankingService';
 import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
 import { ExperienceConfigService } from '../services/ExperienceConfigService';
 import { ExperienceMultiplierService } from '../services/ExperienceMultiplierService';
 import { ExperienceRewardService } from '../services/ExperienceRewardService';
 import { UserManagementService } from '../services/UserManagementService';
 import { Interceptor, InterceptorContext } from '../../../interceptors/Interceptor';
+import type RedisService from '../../../services/RedisService';
 import {
     type ExperienceCalculation,
     type ExperienceGainResult,
@@ -28,17 +30,20 @@ export class TextExperienceService {
     private readonly multiplierService: ExperienceMultiplierService;
     private readonly rewardService: ExperienceRewardService;
     private readonly userService: UserManagementService;
+    private readonly rankingService: ExperienceRankingService;
     private readonly interceptors: Interceptor[] = [];
 
     constructor(
         private readonly prisma: PrismaClient,
-        private readonly cache: ExperienceCacheService
+        private readonly cache: ExperienceCacheService,
+        redisService: RedisService
     ) {
         // Initialize sub-services
         this.configService = new ExperienceConfigService(prisma, cache);
         this.multiplierService = new ExperienceMultiplierService(prisma, cache);
         this.rewardService = new ExperienceRewardService(prisma);
         this.userService = new UserManagementService(prisma);
+        this.rankingService = new ExperienceRankingService(redisService);
     }
 
     /**
@@ -97,6 +102,17 @@ export class TextExperienceService {
                 logger.error(`Error in error interceptor ${interceptor.name}:`, error);
             }
         }
+    }
+
+    // ============================================================================
+    // PUBLIC GETTERS
+    // ============================================================================
+
+    /**
+     * Get the ranking service for leaderboard operations
+     */
+    get ranking(): ExperienceRankingService {
+        return this.rankingService;
     }
 
     // ============================================================================
@@ -176,7 +192,14 @@ export class TextExperienceService {
             // 8. Set cooldown
             await this.cache.setCooldown(guildId, userId, config.cooldownSeconds);
 
-            // 9. Handle level up rewards
+            // 9. Update Redis ranking (fire and forget for performance)
+            this.rankingService
+                .updateUserScore(guildId, userId, updatedMember.textTotalXp)
+                .catch((error) => {
+                    logger.error('Failed to update user ranking in Redis:', error);
+                });
+
+            // 10. Handle level up rewards
             const rewards: string[] = [];
             if (leveledUp) {
                 const levelRewards = await this.rewardService.handleLevelUp(
@@ -191,7 +214,7 @@ export class TextExperienceService {
                 await this.cache.invalidateUserLevel(guildId, userId);
             }
 
-            // 10. Return result
+            // 11. Return result
             const result = {
                 calculation,
                 levelUp: {

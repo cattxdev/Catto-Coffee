@@ -10,6 +10,7 @@ import { TextExperienceService } from './TextExperienceService';
 import { MessageExperienceHandler } from './MessageExperienceHandler';
 import { ExperienceCacheService } from '../ExperienceCacheService';
 import { ExperienceLoggingInterceptor } from '../../../interceptors/built/ExperienceLoggingInterceptor';
+import { syncGuildLeaderboard } from '../utils/leaderboardSync';
 import logger from '../../../utils/logger';
 import type { BotClient } from '../../../structures/BotClient';
 
@@ -24,8 +25,8 @@ export function initializeTextExperience(
     // Create cache service
     const cacheService = new ExperienceCacheService(redisService);
 
-    // Create text experience service
-    const textExpService = new TextExperienceService(prisma, cacheService);
+    // Create text experience service with ranking support
+    const textExpService = new TextExperienceService(prisma, cacheService, redisService);
 
     // Add experience logging interceptor for pretty XP logs
     const experienceLoggingInterceptor = new ExperienceLoggingInterceptor(client);
@@ -40,6 +41,31 @@ export function initializeTextExperience(
             await messageHandler.handleMessage(message);
         } catch (error) {
             logger.error('Error handling message experience:', error);
+        }
+    });
+
+    // Sync existing rankings from database to Redis on startup
+    client.once(Events.ClientReady, async () => {
+        logger.info('Syncing XP leaderboards from database to Redis...');
+        try {
+            const guilds = await prisma.guild.findMany({
+                where: {
+                    members: {
+                        some: {
+                            textTotalXp: { gt: 0 },
+                        },
+                    },
+                },
+                select: { discordId: true },
+            });
+
+            for (const guild of guilds) {
+                await syncGuildLeaderboard(prisma, textExpService.ranking, guild.discordId);
+            }
+
+            logger.success(`✅ Synced leaderboards for ${guilds.length} guilds`);
+        } catch (error) {
+            logger.error('Failed to sync leaderboards on startup:', error);
         }
     });
 
