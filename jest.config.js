@@ -11,6 +11,7 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
+    '^#/generated/(.*)$': '<rootDir>/generated/$1',
     '^#/(.*)$': '<rootDir>/src/$1',
   },
   verbose: true,
@@ -19,6 +20,11 @@ module.exports = {
       tsconfig: {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
+        baseUrl: '.',
+        paths: {
+          '#/*': ['./src/*'],
+          '#/generated/*': ['./generated/*'],
+        },
       }
     }]
   },
