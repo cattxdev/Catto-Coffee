@@ -9,13 +9,13 @@ import { BotClient } from '../structures/BotClient';
 import logger from '../utils/logger';
 
 // Import built-in preconditions
-import { CooldownPrecondition } from './builtin/CooldownPrecondition';
-import { UserPermissionsPrecondition } from './builtin/UserPermissionsPrecondition';
-import { BotPermissionsPrecondition } from './builtin/BotPermissionsPrecondition';
-import { ChannelTypePrecondition } from './builtin/ChannelTypePrecondition';
-import { NSFWPrecondition } from './builtin/NSFWPrecondition';
-import { GuildOnlyPrecondition } from './builtin/GuildOnlyPrecondition';
-import { OwnerOnlyPrecondition } from './builtin/OwnerOnlyPrecondition';
+import { CooldownPrecondition } from './built/CooldownPrecondition';
+import { UserPermissionsPrecondition } from './built/UserPermissionsPrecondition';
+import { BotPermissionsPrecondition } from './built/BotPermissionsPrecondition';
+import { ChannelTypePrecondition } from './built/ChannelTypePrecondition';
+import { NSFWPrecondition } from './built/NSFWPrecondition';
+import { GuildOnlyPrecondition } from './built/GuildOnlyPrecondition';
+import { OwnerOnlyPrecondition } from './built/OwnerOnlyPrecondition';
 
 export class PreconditionManager {
     private preconditions: Collection<string, Precondition>;

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { BotPermissionsPrecondition } from '../../src/preconditions/builtin/BotPermissionsPrecondition';
+import { BotPermissionsPrecondition } from '../../src/preconditions/built/BotPermissionsPrecondition';
 import { PreconditionContext } from '../../src/preconditions/Precondition';
 import { PermissionFlagsBits, Collection, PermissionsBitField } from 'discord.js';
 
