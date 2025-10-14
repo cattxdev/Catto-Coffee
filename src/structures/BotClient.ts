@@ -11,9 +11,11 @@ import { ComponentHandler } from '../handlers/ComponentHandler';
 import { ErrorHandler } from '../handlers/ErrorHandler';
 import { PreconditionManager } from '../preconditions/PreconditionManager';
 import { database } from '../services/DatabaseService';
+import { redis } from '../services/RedisService';
 import logger from '../utils/logger';
 import { Command, ButtonComponent, SelectMenuComponent, ModalComponent } from '../types';
 import type { PrismaClient } from '../../generated/prisma';
+import type RedisService from '../services/RedisService';
 
 /**
  * Main Bot Client Class
@@ -33,6 +35,7 @@ export class BotClient extends Client {
     public errorHandler: ErrorHandler;
     public preconditionManager: PreconditionManager;
     public db: PrismaClient;
+    public redis: RedisService;
 
     constructor() {
         super({
@@ -72,6 +75,9 @@ export class BotClient extends Client {
         // Initialize database
         this.db = database.getClient();
 
+        // Initialize Redis cache (store the service, not the client)
+        this.redis = redis;
+
         // Initialize handlers
         this.commandHandler = new CommandHandler(this);
         this.eventHandler = new EventHandler(this);
@@ -90,6 +96,9 @@ export class BotClient extends Client {
 
             // Connect to database
             await database.connect();
+
+            // Connect to Redis
+            await redis.connect();
 
             // Load all handlers
             await this.commandHandler.loadCommands();
@@ -117,6 +126,9 @@ export class BotClient extends Client {
         
         // Disconnect from database
         await database.disconnect();
+        
+        // Disconnect from Redis
+        await redis.disconnect();
         
         this.destroy();
         logger.close();

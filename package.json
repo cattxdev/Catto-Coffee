@@ -27,10 +27,12 @@
     "@types/signale": "^1.4.7",
     "discord.js": "^14.23.2",
     "dotenv": "^17.2.3",
+    "ioredis": "^5.8.1",
     "signale": "^1.4.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
+    "@types/ioredis": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.7.2",
     "@types/ws": "^8.18.1",
@@ -41,7 +43,7 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
-    "signale": {
+  "signale": {
     "displayScope": true,
     "displayBadge": true,
     "displayDate": true,

@@ -100,5 +100,8 @@ class DatabaseService {
 // Export singleton instance getter
 export const database = DatabaseService.getInstance();
 
+// Export the class for testing purposes
+export { DatabaseService };
+
 // Export PrismaClient type for type safety
 export type { PrismaClient } from '../../generated/prisma';
