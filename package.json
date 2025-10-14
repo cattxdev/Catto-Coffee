@@ -24,8 +24,10 @@
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
     "@prisma/client": "6.17.1",
+    "@types/signale": "^1.4.7",
     "discord.js": "^14.23.2",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "signale": "^1.4.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
@@ -38,5 +40,14 @@
     "ts-jest": "^29.4.5",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+    "signale": {
+    "displayScope": true,
+    "displayBadge": true,
+    "displayDate": true,
+    "displayFilename": false,
+    "displayLabel": true,
+    "displayTimestamp": true,
+    "underlineLabel": true
   }
 }

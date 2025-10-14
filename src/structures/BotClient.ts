@@ -10,8 +10,10 @@ import { EventHandler } from '../handlers/EventHandler';
 import { ComponentHandler } from '../handlers/ComponentHandler';
 import { ErrorHandler } from '../handlers/ErrorHandler';
 import { PreconditionManager } from '../preconditions/PreconditionManager';
+import { database } from '../services/DatabaseService';
 import logger from '../utils/logger';
 import { Command, ButtonComponent, SelectMenuComponent, ModalComponent } from '../types';
+import type { PrismaClient } from '../../generated/prisma';
 
 /**
  * Main Bot Client Class
@@ -30,6 +32,7 @@ export class BotClient extends Client {
     public componentHandler: ComponentHandler;
     public errorHandler: ErrorHandler;
     public preconditionManager: PreconditionManager;
+    public db: PrismaClient;
 
     constructor() {
         super({
@@ -66,6 +69,9 @@ export class BotClient extends Client {
         // Store config
         this.config = config;
 
+        // Initialize database
+        this.db = database.getClient();
+
         // Initialize handlers
         this.commandHandler = new CommandHandler(this);
         this.eventHandler = new EventHandler(this);
@@ -81,6 +87,9 @@ export class BotClient extends Client {
     async initialize(): Promise<void> {
         try {
             logger.info('Initializing bot...');
+
+            // Connect to database
+            await database.connect();
 
             // Load all handlers
             await this.commandHandler.loadCommands();
@@ -105,6 +114,10 @@ export class BotClient extends Client {
      */
     async shutdown(): Promise<void> {
         logger.info('Shutting down bot...');
+        
+        // Disconnect from database
+        await database.disconnect();
+        
         this.destroy();
         logger.close();
         process.exit(0);

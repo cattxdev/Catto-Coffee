@@ -3,6 +3,7 @@
  * @author Catto Bot Team
  */
 
+import { Signale, SignaleOptions } from 'signale';
 import { createWriteStream, existsSync, mkdirSync, WriteStream } from 'fs';
 import { join } from 'path';
 import { config } from '../config/config';
@@ -10,16 +11,16 @@ import { config } from '../config/config';
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
- * Logger class for handling application logs
+ * Logger class for handling application logs using Signale
  */
 class Logger {
+    private signale: Signale;
     private logLevel: LogLevel;
     private logToFile: boolean;
     private logPath: string;
     private logStream?: WriteStream;
     private errorStream?: WriteStream;
     private levels: Record<LogLevel, number>;
-    private colors: Record<LogLevel | 'reset', string>;
 
     constructor() {
         this.logLevel = config.logging.level;
@@ -52,25 +53,22 @@ class Logger {
             error: 3,
         };
 
-        // Colors for console output
-        this.colors = {
-            debug: '\x1b[36m', // Cyan
-            info: '\x1b[32m',  // Green
-            warn: '\x1b[33m',  // Yellow
-            error: '\x1b[31m', // Red
-            reset: '\x1b[0m',
+        // Configure Signale
+        const signaleOptions: SignaleOptions = {
+            disabled: false,
+            interactive: false,
+            logLevel: this.logLevel,
+            scope: 'catto-bot',
+            stream: process.stdout
         };
-    }
 
-    /**
-     * Format log message
-     * @param level - Log level
-     * @param message - Log message
-     * @returns Formatted log message
-     */
-    private formatMessage(level: LogLevel, message: string): string {
-        const timestamp = new Date().toISOString();
-        return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+        this.signale = new Signale(signaleOptions);
+
+        // Add custom loggers
+        this.signale.config({
+            displayTimestamp: true,
+            displayDate: true
+        });
     }
 
     /**
@@ -84,14 +82,21 @@ class Logger {
 
     /**
      * Write log to file
+     * @param level - Log level
      * @param message - Message to write
-     * @param isError - Whether this is an error log
+     * @param args - Additional arguments
      */
-    private writeToFile(message: string, isError = false): void {
+    private writeToFile(level: LogLevel, message: string, args: any[]): void {
         if (!this.logToFile) return;
 
-        const stream = isError ? this.errorStream : this.logStream;
-        stream?.write(message + '\n');
+        const timestamp = new Date().toISOString();
+        const formattedMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+        const fullMessage = args.length > 0 
+            ? `${formattedMessage} ${JSON.stringify(args)}`
+            : formattedMessage;
+
+        const stream = level === 'error' ? this.errorStream : this.logStream;
+        stream?.write(fullMessage + '\n');
     }
 
     /**
@@ -102,9 +107,8 @@ class Logger {
     debug(message: string, ...args: any[]): void {
         if (!this.shouldLog('debug')) return;
 
-        const formattedMessage = this.formatMessage('debug', message);
-        console.log(`${this.colors.debug}${formattedMessage}${this.colors.reset}`, ...args);
-        this.writeToFile(`${formattedMessage} ${JSON.stringify(args)}`);
+        this.signale.debug(message, ...args);
+        this.writeToFile('debug', message, args);
     }
 
     /**
@@ -115,9 +119,20 @@ class Logger {
     info(message: string, ...args: any[]): void {
         if (!this.shouldLog('info')) return;
 
-        const formattedMessage = this.formatMessage('info', message);
-        console.log(`${this.colors.info}${formattedMessage}${this.colors.reset}`, ...args);
-        this.writeToFile(`${formattedMessage} ${JSON.stringify(args)}`);
+        this.signale.info(message, ...args);
+        this.writeToFile('info', message, args);
+    }
+
+    /**
+     * Log success message
+     * @param message - Message to log
+     * @param args - Additional arguments
+     */
+    success(message: string, ...args: any[]): void {
+        if (!this.shouldLog('info')) return;
+
+        this.signale.success(message, ...args);
+        this.writeToFile('info', message, args);
     }
 
     /**
@@ -128,9 +143,8 @@ class Logger {
     warn(message: string, ...args: any[]): void {
         if (!this.shouldLog('warn')) return;
 
-        const formattedMessage = this.formatMessage('warn', message);
-        console.warn(`${this.colors.warn}${formattedMessage}${this.colors.reset}`, ...args);
-        this.writeToFile(`${formattedMessage} ${JSON.stringify(args)}`);
+        this.signale.warn(message, ...args);
+        this.writeToFile('warn', message, args);
     }
 
     /**
@@ -141,9 +155,44 @@ class Logger {
     error(message: string, ...args: any[]): void {
         if (!this.shouldLog('error')) return;
 
-        const formattedMessage = this.formatMessage('error', message);
-        console.error(`${this.colors.error}${formattedMessage}${this.colors.reset}`, ...args);
-        this.writeToFile(`${formattedMessage} ${JSON.stringify(args)}`, true);
+        this.signale.error(message, ...args);
+        this.writeToFile('error', message, args);
+    }
+
+    /**
+     * Log database message
+     * @param message - Message to log
+     * @param args - Additional arguments
+     */
+    database(message: string, ...args: any[]): void {
+        if (!this.shouldLog('info')) return;
+
+        this.signale.info(`💾 [Database] ${message}`, ...args);
+        this.writeToFile('info', `[Database] ${message}`, args);
+    }
+
+    /**
+     * Log command execution
+     * @param message - Message to log
+     * @param args - Additional arguments
+     */
+    command(message: string, ...args: any[]): void {
+        if (!this.shouldLog('info')) return;
+
+        this.signale.info(`⚡ [Command] ${message}`, ...args);
+        this.writeToFile('info', `[Command] ${message}`, args);
+    }
+
+    /**
+     * Log event execution
+     * @param message - Message to log
+     * @param args - Additional arguments
+     */
+    event(message: string, ...args: any[]): void {
+        if (!this.shouldLog('info')) return;
+
+        this.signale.info(`📡 [Event] ${message}`, ...args);
+        this.writeToFile('info', `[Event] ${message}`, args);
     }
 
     /**
