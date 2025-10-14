@@ -12,7 +12,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
+generated
 # Environment variables
 .env
 .env.local
@@ -31,3 +31,5 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+/src/generated/prisma

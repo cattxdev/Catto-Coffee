@@ -1,0 +1,675 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum ExperienceType {
+  TEXT
+  VOICE
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum CommandRestrictionType {
+  ROLE_WHITELIST
+  ROLE_BLACKLIST
+  CHANNEL_WHITELIST
+  CHANNEL_BLACKLIST
+}
+
+enum AuditLogAction {
+  COMMAND_EXECUTED
+  LEVEL_UP
+  ROLE_REWARDED
+  USER_BLACKLISTED
+  USER_UNBLACKLISTED
+  EXPERIENCE_MODIFIED
+  CONFIG_CHANGED
+}
+
+enum BlacklistReason {
+  SPAM
+  ABUSE
+  CHEATING
+  VIOLATION
+  OTHER
+}
+
+// ============================================================================
+// USER MODELS
+// ============================================================================
+
+model User {
+  id        String @id @default(cuid())
+  discordId String @unique @map("discord_id")
+
+  // Global Statistics (denormalized for performance)
+  globalExperience      Int @default(0) @map("global_experience")
+  globalLevel           Int @default(1) @map("global_level")
+  totalMessagesCount    Int @default(0) @map("total_messages_count")
+  totalVoiceTimeSeconds Int @default(0) @map("total_voice_time_seconds")
+
+  // Profile
+  bio String? @db.VarChar(500)
+
+  // Timestamps
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  // Relations
+  guildMemberships GuildMember[]
+  badges           UserBadge[]
+  rankCardConfig   UserRankCardConfig?
+  blacklistEntry   UserBlacklist?
+  tempVoicePrefs   UserTempVoicePreference?
+  auditLogs        AuditLog[]
+
+  @@index([discordId])
+  @@index([globalLevel])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model UserRankCardConfig {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  backgroundUrl       String? @map("background_url") @db.VarChar(512)
+  primaryColor        String  @default("#5865F2") @map("primary_color") @db.VarChar(7)
+  secondaryColor      String  @default("#3B3F46") @map("secondary_color") @db.VarChar(7)
+  accentColor         String  @default("#00D9FF") @map("accent_color") @db.VarChar(7)
+  progressBarGradient Boolean @default(true) @map("progress_bar_gradient")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_rank_card_configs")
+}
+
+model UserTempVoicePreference {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  defaultChannelName String? @map("default_channel_name") @db.VarChar(100)
+  defaultUserLimit   Int?    @map("default_user_limit")
+  defaultLocked      Boolean @default(false) @map("default_locked")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_temp_voice_preferences")
+}
+
+model UserBlacklist {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  reason        BlacklistReason
+  details       String?         @db.VarChar(500)
+  expiresAt     DateTime?       @map("expires_at")
+  blacklistedBy String?         @map("blacklisted_by") // Admin user ID
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("user_blacklists")
+}
+
+// ============================================================================
+// GUILD MODELS
+// ============================================================================
+
+model Guild {
+  id        String @id @default(cuid())
+  discordId String @unique @map("discord_id")
+  name      String @db.VarChar(100)
+
+  // Configuration
+  prefix   String? @db.VarChar(10)
+  locale   String  @default("en") @db.VarChar(5)
+  timezone String  @default("UTC") @db.VarChar(50)
+
+  // Features
+  isPremium        Boolean   @default(false) @map("is_premium")
+  premiumExpiresAt DateTime? @map("premium_expires_at")
+
+  // Metadata
+  memberCount Int       @default(0) @map("member_count")
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+  leftAt      DateTime? @map("left_at")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  members          GuildMember[]
+  badges           GuildBadge[]
+  blacklistedUsers GuildUserBlacklist[]
+  webhook          GuildWebhook?
+
+  // Experience & Leveling
+  experienceConfigs     ExperienceConfig[]
+  experienceMultipliers ExperienceMultiplier[]
+  levelRewards          LevelReward[]
+  leaderboardRewards    LeaderboardReward[]
+
+  // Channels
+  channelConfigs    ChannelConfig[]
+  leaderboardConfig LeaderboardConfig?
+  tempVoiceConfigs  TempVoiceConfig[]
+
+  // Commands & Permissions
+  commandConfigs      CommandConfig[]
+  commandRestrictions CommandRestriction[]
+
+  // Leaderboard State
+  leaderboardStates LeaderboardState[]
+
+  // Audit
+  auditLogs AuditLog[]
+
+  @@index([discordId])
+  @@index([isPremium])
+  @@index([joinedAt])
+  @@index([leftAt])
+  @@map("guilds")
+}
+
+model GuildMember {
+  id            String @id @default(cuid())
+  guildId       String @map("guild_id")
+  userId        String @map("user_id")
+  userDiscordId String @map("user_discord_id")
+
+  // Text Experience
+  textXp           Int @default(0) @map("text_xp")
+  textLevel        Int @default(1) @map("text_level")
+  textTotalXp      Int @default(0) @map("text_total_xp")
+  textMessageCount Int @default(0) @map("text_message_count")
+
+  // Voice Experience  
+  voiceXp          Int @default(0) @map("voice_xp")
+  voiceLevel       Int @default(1) @map("voice_level")
+  voiceTotalXp     Int @default(0) @map("voice_total_xp")
+  voiceTimeSeconds Int @default(0) @map("voice_time_seconds")
+
+  // Periodic Stats (reset by cron jobs)
+  dailyTextMessages   Int @default(0) @map("daily_text_messages")
+  weeklyTextMessages  Int @default(0) @map("weekly_text_messages")
+  monthlyTextMessages Int @default(0) @map("monthly_text_messages")
+
+  dailyVoiceSeconds   Int @default(0) @map("daily_voice_seconds")
+  weeklyVoiceSeconds  Int @default(0) @map("weekly_voice_seconds")
+  monthlyVoiceSeconds Int @default(0) @map("monthly_voice_seconds")
+
+  // Activity Tracking
+  lastMessageAt DateTime? @map("last_message_at")
+  lastVoiceAt   DateTime? @map("last_voice_at")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tempVoiceChannels TempVoiceChannel[]
+  trustedInChannels TrustedVoiceUser[]
+
+  @@unique([guildId, userDiscordId])
+  @@index([guildId, textLevel])
+  @@index([guildId, voiceLevel])
+  @@index([guildId, textTotalXp])
+  @@index([guildId, voiceTotalXp])
+  @@index([guildId, dailyTextMessages])
+  @@index([guildId, weeklyTextMessages])
+  @@index([guildId, monthlyTextMessages])
+  @@index([guildId, dailyVoiceSeconds])
+  @@index([guildId, weeklyVoiceSeconds])
+  @@index([guildId, monthlyVoiceSeconds])
+  @@index([userId])
+  @@index([userDiscordId])
+  @@map("guild_members")
+}
+
+model GuildUserBlacklist {
+  id            String @id @default(cuid())
+  guildId       String @map("guild_id")
+  userDiscordId String @map("user_discord_id")
+
+  reason        BlacklistReason
+  details       String?         @db.VarChar(500)
+  expiresAt     DateTime?       @map("expires_at")
+  blacklistedBy String?         @map("blacklisted_by") // Admin discord ID
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, userDiscordId])
+  @@index([guildId])
+  @@index([userDiscordId])
+  @@index([expiresAt])
+  @@map("guild_user_blacklists")
+}
+
+model GuildWebhook {
+  id      String @id @default(cuid())
+  guildId String @unique @map("guild_id")
+
+  channelId    String @map("channel_id")
+  webhookId    String @map("webhook_id")
+  webhookToken String @map("webhook_token") // Encrypted
+  encryptionIv String @map("encryption_iv")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+  @@map("guild_webhooks")
+}
+
+// ============================================================================
+// BADGE SYSTEM
+// ============================================================================
+
+model Badge {
+  id          String  @id @default(cuid())
+  identifier  String  @unique
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+  imageUrl    String  @map("image_url") @db.VarChar(512)
+
+  // Metadata
+  category String? @db.VarChar(50)
+  rarity   Int     @default(1) // 1-5 scale
+  isGlobal Boolean @default(true) @map("is_global")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userBadges  UserBadge[]
+  guildBadges GuildBadge[]
+
+  @@index([identifier])
+  @@index([isGlobal])
+  @@index([category])
+  @@map("badges")
+}
+
+model UserBadge {
+  id      String @id @default(cuid())
+  userId  String @map("user_id")
+  badgeId String @map("badge_id")
+
+  awardedAt DateTime @default(now()) @map("awarded_at")
+  awardedBy String?  @map("awarded_by") // Admin user ID
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+  @@index([awardedAt])
+  @@map("user_badges")
+}
+
+model GuildBadge {
+  id      String @id @default(cuid())
+  guildId String @map("guild_id")
+  badgeId String @map("badge_id")
+
+  enabledAt DateTime @default(now()) @map("enabled_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, badgeId])
+  @@index([guildId])
+  @@index([badgeId])
+  @@map("guild_badges")
+}
+
+// ============================================================================
+// EXPERIENCE & LEVELING SYSTEM
+// ============================================================================
+
+model ExperienceConfig {
+  id      String         @id @default(cuid())
+  guildId String         @map("guild_id")
+  type    ExperienceType
+
+  // XP Settings
+  isEnabled       Boolean @default(true) @map("is_enabled")
+  minXp           Int     @default(15) @map("min_xp")
+  maxXp           Int     @default(25) @map("max_xp")
+  cooldownSeconds Int     @default(60) @map("cooldown_seconds")
+
+  // Level Up Notifications
+  announceLevel     Boolean @default(true) @map("announce_level")
+  announceChannelId String? @map("announce_channel_id")
+  announceMessage   String? @map("announce_message") @db.VarChar(500)
+  announceDmUser    Boolean @default(false) @map("announce_dm_user")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type])
+  @@index([guildId])
+  @@map("experience_configs")
+}
+
+model ExperienceMultiplier {
+  id      String         @id @default(cuid())
+  guildId String         @map("guild_id")
+  type    ExperienceType
+
+  // Target
+  targetType String @map("target_type") // "role", "channel", "user"
+  targetId   String @map("target_id")
+
+  // Multiplier (stored as basis points: 100 = 1x, 150 = 1.5x, 200 = 2x)
+  multiplierBps Int @default(100) @map("multiplier_bps")
+
+  // Schedule (optional)
+  startsAt  DateTime? @map("starts_at")
+  expiresAt DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type, targetType, targetId])
+  @@index([guildId, type])
+  @@index([expiresAt])
+  @@map("experience_multipliers")
+}
+
+model LevelReward {
+  id      String         @id @default(cuid())
+  guildId String         @map("guild_id")
+  type    ExperienceType
+
+  level       Int     @map("level")
+  roleId      String  @map("role_id")
+  removeOther Boolean @default(false) @map("remove_other") // Remove other level roles
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type, level, roleId])
+  @@index([guildId, type, level])
+  @@map("level_rewards")
+}
+
+model LeaderboardReward {
+  id      String            @id @default(cuid())
+  guildId String            @map("guild_id")
+  type    ExperienceType
+  period  LeaderboardPeriod
+
+  position Int    @map("position") // 1 = 1st place, 2 = 2nd, etc.
+  roleId   String @map("role_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type, period, position])
+  @@index([guildId, type, period])
+  @@map("leaderboard_rewards")
+}
+
+// ============================================================================
+// CHANNEL CONFIGURATION
+// ============================================================================
+
+model ChannelConfig {
+  id        String @id @default(cuid())
+  guildId   String @map("guild_id")
+  channelId String @map("channel_id")
+
+  // Feature Flags
+  xpDisabled       Boolean @default(false) @map("xp_disabled")
+  commandsDisabled Boolean @default(false) @map("commands_disabled")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, channelId])
+  @@index([guildId])
+  @@map("channel_configs")
+}
+
+model LeaderboardConfig {
+  id      String @id @default(cuid())
+  guildId String @unique @map("guild_id")
+
+  // Text Leaderboards
+  dailyTextChannelId   String? @map("daily_text_channel_id")
+  weeklyTextChannelId  String? @map("weekly_text_channel_id")
+  monthlyTextChannelId String? @map("monthly_text_channel_id")
+
+  // Voice Leaderboards
+  dailyVoiceChannelId   String? @map("daily_voice_channel_id")
+  weeklyVoiceChannelId  String? @map("weekly_voice_channel_id")
+  monthlyVoiceChannelId String? @map("monthly_voice_channel_id")
+
+  // Display Settings
+  maxEntries Int @default(10) @map("max_entries")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@map("leaderboard_configs")
+}
+
+model LeaderboardState {
+  id      String            @id @default(cuid())
+  guildId String            @map("guild_id")
+  type    ExperienceType
+  period  LeaderboardPeriod
+
+  lastMessageId String?  @map("last_message_id")
+  lastUpdatedAt DateTime @default(now()) @map("last_updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type, period])
+  @@index([guildId])
+  @@map("leaderboard_states")
+}
+
+// ============================================================================
+// TEMPORARY VOICE CHANNELS
+// ============================================================================
+
+model TempVoiceConfig {
+  id         String @id @default(cuid())
+  guildId    String @map("guild_id")
+  channelId  String @map("channel_id") // Join-to-create trigger channel
+  categoryId String @map("category_id")
+
+  // Creation Settings
+  defaultChannelName String? @map("default_channel_name") @db.VarChar(100)
+  defaultUserLimit   Int?    @map("default_user_limit")
+  channelNamePattern String? @map("channel_name_pattern") @db.VarChar(100)
+  autoNumberChannels Boolean @default(true) @map("auto_number_channels")
+
+  // Permissions
+  allowRename Boolean @default(true) @map("allow_rename")
+  allowLimit  Boolean @default(true) @map("allow_limit")
+  allowLock   Boolean @default(true) @map("allow_lock")
+  allowTrust  Boolean @default(true) @map("allow_trust")
+
+  // Auto-delete
+  deleteWhenEmpty Boolean @default(true) @map("delete_when_empty")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild          Guild                    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  permittedRoles TempVoicePermittedRole[]
+
+  @@unique([guildId, channelId])
+  @@index([guildId])
+  @@index([channelId])
+  @@map("temp_voice_configs")
+}
+
+model TempVoicePermittedRole {
+  id       String @id @default(cuid())
+  configId String @map("config_id")
+  roleId   String @map("role_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  config TempVoiceConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, roleId])
+  @@index([configId])
+  @@map("temp_voice_permitted_roles")
+}
+
+model TempVoiceChannel {
+  id         String @id @default(cuid())
+  guildId    String @map("guild_id")
+  channelId  String @unique @map("channel_id")
+  ownerId    String @map("owner_id")
+  categoryId String @map("category_id")
+
+  // State
+  isLocked Boolean @default(false) @map("is_locked")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner        GuildMember        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  trustedUsers TrustedVoiceUser[]
+
+  @@index([guildId])
+  @@index([ownerId])
+  @@index([channelId])
+  @@map("temp_voice_channels")
+}
+
+model TrustedVoiceUser {
+  id              String @id @default(cuid())
+  channelId       String @map("channel_id")
+  trustedMemberId String @map("trusted_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  channel       TempVoiceChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  trustedMember GuildMember      @relation(fields: [trustedMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, trustedMemberId])
+  @@index([channelId])
+  @@index([trustedMemberId])
+  @@map("trusted_voice_users")
+}
+
+// ============================================================================
+// COMMAND SYSTEM
+// ============================================================================
+
+model CommandConfig {
+  id          String @id @default(cuid())
+  guildId     String @map("guild_id")
+  commandName String @map("command_name")
+
+  isEnabled Boolean @default(true) @map("is_enabled")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, commandName])
+  @@index([guildId])
+  @@map("command_configs")
+}
+
+model CommandRestriction {
+  id          String                 @id @default(cuid())
+  guildId     String                 @map("guild_id")
+  commandName String                 @map("command_name")
+  type        CommandRestrictionType
+
+  targetId String @map("target_id") // Role ID or Channel ID
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, commandName, type, targetId])
+  @@index([guildId, commandName])
+  @@map("command_restrictions")
+}
+
+// ============================================================================
+// AUDIT & LOGGING
+// ============================================================================
+
+model AuditLog {
+  id      String         @id @default(cuid())
+  guildId String         @map("guild_id")
+  userId  String         @map("user_id")
+  action  AuditLogAction
+
+  // Context
+  targetId    String? @map("target_id") // User/Channel/Role affected
+  commandName String? @map("command_name")
+  metadata    Json? // Flexible field for action-specific data
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, action])
+  @@index([guildId, userId])
+  @@index([guildId, createdAt])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
