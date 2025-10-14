@@ -10,6 +10,7 @@ import { ExperienceConfigService } from '../services/ExperienceConfigService';
 import { ExperienceMultiplierService } from '../services/ExperienceMultiplierService';
 import { ExperienceRewardService } from '../services/ExperienceRewardService';
 import { UserManagementService } from '../services/UserManagementService';
+import { Interceptor, InterceptorContext } from '../../../interceptors/Interceptor';
 import {
     type ExperienceCalculation,
     type ExperienceGainResult,
@@ -27,6 +28,7 @@ export class TextExperienceService {
     private readonly multiplierService: ExperienceMultiplierService;
     private readonly rewardService: ExperienceRewardService;
     private readonly userService: UserManagementService;
+    private readonly interceptors: Interceptor[] = [];
 
     constructor(
         private readonly prisma: PrismaClient,
@@ -37,6 +39,64 @@ export class TextExperienceService {
         this.multiplierService = new ExperienceMultiplierService(prisma, cache);
         this.rewardService = new ExperienceRewardService(prisma);
         this.userService = new UserManagementService(prisma);
+    }
+
+    /**
+     * Add an interceptor to this service
+     */
+    addInterceptor(interceptor: Interceptor): void {
+        this.interceptors.push(interceptor);
+        // Sort by priority (lower priority = runs first)
+        this.interceptors.sort((a, b) => a.priority - b.priority);
+    }
+
+    /**
+     * Execute interceptors before an operation
+     */
+    private async executeBeforeInterceptors(context: InterceptorContext): Promise<boolean> {
+        for (const interceptor of this.interceptors) {
+            if (!interceptor.enabled || !interceptor.before) continue;
+
+            try {
+                const result = await interceptor.before(context);
+                if (!result.success || result.skip) {
+                    return false;
+                }
+            } catch (error) {
+                logger.error(`Error in interceptor ${interceptor.name}:`, error);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Execute interceptors after an operation
+     */
+    private async executeAfterInterceptors(context: InterceptorContext): Promise<void> {
+        for (const interceptor of this.interceptors) {
+            if (!interceptor.enabled || !interceptor.after) continue;
+
+            try {
+                await interceptor.after(context);
+            } catch (error) {
+                logger.error(`Error in interceptor ${interceptor.name}:`, error);
+            }
+        }
+    }
+
+    /**
+     * Execute interceptors on error
+     */
+    private async executeErrorInterceptors(context: InterceptorContext): Promise<void> {
+        for (const interceptor of this.interceptors) {
+            if (!interceptor.enabled || !interceptor.onError) continue;
+
+            try {
+                await interceptor.onError(context);
+            } catch (error) {
+                logger.error(`Error in error interceptor ${interceptor.name}:`, error);
+            }
+        }
     }
 
     // ============================================================================
@@ -54,6 +114,20 @@ export class TextExperienceService {
         userId: string,
         guildId: string
     ): Promise<ExperienceGainResult | null> {
+        const startTime = Date.now();
+        const context: InterceptorContext = {
+            operation: 'awardExperience',
+            target: 'TextExperienceService',
+            args: { userId, guildId },
+            startTime,
+        };
+
+        // Execute before interceptors
+        const shouldContinue = await this.executeBeforeInterceptors(context);
+        if (!shouldContinue) {
+            return null;
+        }
+
         try {
             // 1. Check if experience is enabled
             const config = await this.configService.getConfig(guildId);
@@ -118,7 +192,7 @@ export class TextExperienceService {
             }
 
             // 10. Return result
-            return {
+            const result = {
                 calculation,
                 levelUp: {
                     leveledUp,
@@ -133,7 +207,17 @@ export class TextExperienceService {
                 ),
                 xpForNextLevel: ExperienceCalculator.getXpRequiredForLevel(newLevel + 1),
             };
+
+            // Execute after interceptors
+            context.result = result;
+            await this.executeAfterInterceptors(context);
+
+            return result;
         } catch (error) {
+            // Execute error interceptors
+            context.error = error as Error;
+            await this.executeErrorInterceptors(context);
+
             logger.error('Error awarding experience:', error);
             throw error;
         }

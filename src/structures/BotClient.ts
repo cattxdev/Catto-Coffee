@@ -13,6 +13,7 @@ import { PreconditionManager } from '../preconditions/PreconditionManager';
 import { database } from '../services/DatabaseService';
 import { redis } from '../services/RedisService';
 import { initializeVoiceExperience, VoiceExperienceService } from '../modules/experience/voice';
+import { initializeTextExperience, TextExperienceService } from '../modules/experience/text';
 import { ExperienceRewardService } from '../modules/experience/services/ExperienceRewardService';
 import logger from '../utils/logger';
 import { Command, ButtonComponent, SelectMenuComponent, ModalComponent } from '../types';
@@ -39,6 +40,7 @@ export class BotClient extends Client {
     public db: PrismaClient;
     public redis: RedisService;
     public voiceExperience?: VoiceExperienceService;
+    public textExperience?: TextExperienceService;
 
     constructor() {
         super({
@@ -108,16 +110,23 @@ export class BotClient extends Client {
             await this.eventHandler.loadEvents();
             await this.componentHandler.loadComponents();
 
-            // Initialize voice experience module
-            logger.info('Initializing voice experience module...');
+            // Initialize reward service (shared by both text and voice)
             const rewardService = new ExperienceRewardService(this.db);
+
+            // Initialize text experience module
+            this.textExperience = initializeTextExperience(
+                this,
+                this.db,
+                this.redis
+            );
+
+            // Initialize voice experience module
             this.voiceExperience = initializeVoiceExperience(
                 this,
                 this.db,
                 redis.getClient(),
                 rewardService
             );
-            logger.info('Voice experience module initialized');
 
             // Setup global error handlers
             this.errorHandler.setupGlobalHandlers();
@@ -137,6 +146,12 @@ export class BotClient extends Client {
      */
     async shutdown(): Promise<void> {
         logger.info('Shutting down bot...');
+        
+        // Cleanup text experience module
+        if (this.textExperience) {
+            logger.info('Cleaning up text experience module...');
+            this.textExperience = undefined;
+        }
         
         // Cleanup voice experience module
         if (this.voiceExperience) {

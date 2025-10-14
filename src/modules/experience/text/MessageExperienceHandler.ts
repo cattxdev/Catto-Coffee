@@ -5,10 +5,8 @@
 
 import type { Message } from 'discord.js';
 import { ChannelType } from 'discord.js';
-import type { BotClient } from '#/structures/BotClient';
 import logger from '#/utils/logger';
 import { TextExperienceService } from './TextExperienceService';
-import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
 import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
 
 /**
@@ -17,10 +15,8 @@ import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator'
 export class MessageExperienceHandler {
     private readonly experienceService: TextExperienceService;
 
-    constructor(client: BotClient) {
-        // Initialize services
-        const cacheService = new ExperienceCacheService(client.redis);
-        this.experienceService = new TextExperienceService(client.db, cacheService);
+    constructor(experienceService: TextExperienceService) {
+        this.experienceService = experienceService;
     }
 
     /**
