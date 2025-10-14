@@ -13,6 +13,7 @@ export { LoggingInterceptor, LoggingInterceptorOptions } from './built/LoggingIn
 export { MetricsInterceptor } from './built/MetricsInterceptor';
 export { AuditInterceptor, AuditEntry } from './built/AuditInterceptor';
 export { DatabaseInterceptor, DatabaseInterceptorOptions } from './built/DatabaseInterceptor';
+export { ExperienceLoggingInterceptor } from './built/ExperienceLoggingInterceptor';
 
 // Utilities
 export { withInterceptors, Intercept, executeWithInterceptors } from './utils';

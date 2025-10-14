@@ -9,7 +9,7 @@ import type RedisService from '../../../services/RedisService';
 import { TextExperienceService } from './TextExperienceService';
 import { MessageExperienceHandler } from './MessageExperienceHandler';
 import { ExperienceCacheService } from '../ExperienceCacheService';
-import { LoggingInterceptor } from '../../../interceptors/built/LoggingInterceptor';
+import { ExperienceLoggingInterceptor } from '../../../interceptors/built/ExperienceLoggingInterceptor';
 import logger from '../../../utils/logger';
 import type { BotClient } from '../../../structures/BotClient';
 
@@ -27,17 +27,9 @@ export function initializeTextExperience(
     // Create text experience service
     const textExpService = new TextExperienceService(prisma, cacheService);
 
-    // Add logging interceptor to text experience operations
-    const loggingInterceptor = new LoggingInterceptor({
-        logLevel: 'info', // Changed to info so it shows in console
-        logArgs: false, // Don't log args (can contain sensitive data)
-        logResults: false, // Don't log results (can be large)
-        logDuration: true, // Log execution time
-    });
-
-    // Register interceptor for text experience operations
-    // This will log all experience-related operations
-    textExpService.addInterceptor(loggingInterceptor);
+    // Add experience logging interceptor for pretty XP logs
+    const experienceLoggingInterceptor = new ExperienceLoggingInterceptor(client);
+    textExpService.addInterceptor(experienceLoggingInterceptor);
 
     // Create message handler with the service instance that has interceptors
     const messageHandler = new MessageExperienceHandler(textExpService);
