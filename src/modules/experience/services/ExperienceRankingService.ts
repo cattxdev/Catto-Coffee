@@ -3,8 +3,8 @@
  * @author Catto Bot Team
  */
 
-import type RedisService from '../../services/RedisService';
-import logger from '../../utils/logger';
+import type RedisService from '../../../services/RedisService';
+import logger from '../../../utils/logger';
 
 /**
  * Leaderboard entry with ranking information

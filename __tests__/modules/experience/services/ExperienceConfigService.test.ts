@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { PrismaClient } from '@prisma/client/edge';
 import { ExperienceType } from '../../../../generated/prisma';
-import { ExperienceCacheService } from '../../../../src/modules/experience/ExperienceCacheService';
+import { ExperienceCacheService } from '../../../../src/modules/experience/services/ExperienceCacheService';
 import { ExperienceConfigService } from '../../../../src/modules/experience/services/ExperienceConfigService';
 
 describe('ExperienceConfigService', () => {

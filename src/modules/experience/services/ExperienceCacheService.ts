@@ -3,9 +3,9 @@
  * @author Catto Bot Team
  */
 
-import type RedisService from '../../services/RedisService';
-import type { ExperienceConfigCache, LeaderboardEntry } from './types';
-import { CacheKeys, CacheTTL } from './types';
+import type RedisService from '../../../services/RedisService';
+import type { ExperienceConfigCache, LeaderboardEntry } from '../types';
+import { CacheKeys, CacheTTL } from '../types';
 
 /**
  * Service for handling all experience-related Redis caching operations

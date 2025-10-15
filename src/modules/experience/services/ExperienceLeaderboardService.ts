@@ -4,7 +4,7 @@
  */
 
 import type { PrismaClient } from '#/generated/prisma';
-import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
+import { ExperienceCacheService } from '#/modules/experience/services/ExperienceCacheService';
 import type { LeaderboardEntry, LeaderboardOptions } from '#/modules/experience/types';
 import logger from '#/utils/logger';
 

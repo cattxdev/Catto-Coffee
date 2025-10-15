@@ -7,7 +7,7 @@ import type { Message } from 'discord.js';
 import { ChannelType } from 'discord.js';
 import logger from '#/utils/logger';
 import { TextExperienceService } from './TextExperienceService';
-import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
+import { ExperienceCalculator } from '#/modules/experience/services/ExperienceCalculator';
 
 /**
  * Handler for awarding text experience on message creation

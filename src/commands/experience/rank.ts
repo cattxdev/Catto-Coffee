@@ -8,7 +8,7 @@ import {
     EmbedBuilder,
 } from 'discord.js';
 import { Command } from '../../types';
-import { ExperienceCalculator } from '../../modules/experience/ExperienceCalculator';
+import { ExperienceCalculator } from '../../modules/experience/services/ExperienceCalculator';
 import logger from '../../utils/logger';
 
 const command: Command = {

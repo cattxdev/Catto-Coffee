@@ -6,7 +6,7 @@
  */
 
 import type { PrismaClient } from '#/generated/prisma';
-import { ExperienceRankingService } from '../ExperienceRankingService';
+import { ExperienceRankingService } from '../services/ExperienceRankingService';
 import logger from '#/utils/logger';
 
 /**

@@ -8,7 +8,7 @@ import type { PrismaClient } from '../../../../generated/prisma';
 import type RedisService from '../../../services/RedisService';
 import { TextExperienceService } from './TextExperienceService';
 import { MessageExperienceHandler } from './MessageExperienceHandler';
-import { ExperienceCacheService } from '../ExperienceCacheService';
+import { ExperienceCacheService } from '../services/ExperienceCacheService';
 import { ExperienceLoggingInterceptor } from '../../../interceptors/built/ExperienceLoggingInterceptor';
 import { syncGuildLeaderboard } from '../utils/leaderboardSync';
 import logger from '../../../utils/logger';

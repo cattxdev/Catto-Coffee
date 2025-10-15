@@ -4,9 +4,9 @@
  */
 
 import type { PrismaClient } from '#/generated/prisma';
-import { ExperienceCacheService } from '#/modules/experience/ExperienceCacheService';
-import { ExperienceRankingService } from '#/modules/experience/ExperienceRankingService';
-import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
+import { ExperienceCacheService } from '#/modules/experience/services/ExperienceCacheService';
+import { ExperienceRankingService } from '#/modules/experience/services/ExperienceRankingService';
+import { ExperienceCalculator } from '#/modules/experience/services/ExperienceCalculator';
 import { ExperienceConfigService } from '../services/ExperienceConfigService';
 import { ExperienceMultiplierService } from '../services/ExperienceMultiplierService';
 import { ExperienceRewardService } from '../services/ExperienceRewardService';

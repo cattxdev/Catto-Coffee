@@ -4,7 +4,7 @@
  */
 
 import type { PrismaClient } from '#/generated/prisma';
-import { ExperienceCalculator } from '#/modules/experience/ExperienceCalculator';
+import { ExperienceCalculator } from '#/modules/experience/services/ExperienceCalculator';
 import type { ExperienceStats } from '#/modules/experience/types';
 import logger from '#/utils/logger';
 

@@ -25,6 +25,7 @@
   "dependencies": {
     "@prisma/client": "6.17.1",
     "@types/signale": "^1.4.7",
+    "canvas": "^3.2.0",
     "discord.js": "^14.23.2",
     "dotenv": "^17.2.3",
     "ioredis": "^5.8.1",

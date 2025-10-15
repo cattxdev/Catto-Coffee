@@ -3,7 +3,7 @@
  * @author Catto Bot Team
  */
 
-import { ExperienceRankingService } from '../../../../src/modules/experience/ExperienceRankingService';
+import { ExperienceRankingService } from '../../../../src/modules/experience/services/ExperienceRankingService';
 import RedisService from '../../../../src/services/RedisService';
 
 describe('ExperienceRankingService - Comprehensive Tests', () => {

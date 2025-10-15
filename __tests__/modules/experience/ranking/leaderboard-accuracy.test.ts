@@ -3,8 +3,8 @@
  * @author Catto Bot Team
  */
 
-import { ExperienceRankingService } from '../../../../src/modules/experience/ExperienceRankingService';
-import { ExperienceCalculator } from '../../../../src/modules/experience/ExperienceCalculator';
+import { ExperienceRankingService } from '../../../../src/modules/experience/services/ExperienceRankingService';
+import { ExperienceCalculator } from '../../../../src/modules/experience/services/ExperienceCalculator';
 import RedisService from '../../../../src/services/RedisService';
 
 describe('Leaderboard Accuracy Test', () => {

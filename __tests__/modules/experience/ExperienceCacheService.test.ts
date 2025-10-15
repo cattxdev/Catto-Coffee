@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { ExperienceType } from '../../../generated/prisma';
-import { ExperienceCacheService } from '../../../src/modules/experience/ExperienceCacheService';
+import { ExperienceCacheService } from '../../../src/modules/experience/services/ExperienceCacheService';
 import { ExperienceConfigCache, LeaderboardEntry } from '../../../src/modules/experience/types';
 import { redis } from '../../../src/services/RedisService';
 

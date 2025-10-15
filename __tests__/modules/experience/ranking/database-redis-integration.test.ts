@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '../../../../generated/prisma';
-import { ExperienceRankingService } from '../../../../src/modules/experience/ExperienceRankingService';
+import { ExperienceRankingService } from '../../../../src/modules/experience/services/ExperienceRankingService';
 import { syncGuildLeaderboard, syncAllLeaderboards } from '../../../../src/modules/experience/utils/leaderboardSync';
 import RedisService from '../../../../src/services/RedisService';
 

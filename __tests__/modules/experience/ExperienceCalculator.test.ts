@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { ExperienceCalculator } from '../../../src/modules/experience/ExperienceCalculator';
+import { ExperienceCalculator } from '../../../src/modules/experience/services/ExperienceCalculator';
 
 describe('ExperienceCalculator', () => {
     describe('calculateLevel', () => {
