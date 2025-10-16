@@ -5,10 +5,10 @@
 
 import {
     SlashCommandBuilder,
-    EmbedBuilder,
+    AttachmentBuilder,
 } from 'discord.js';
 import { Command } from '../../types';
-import { ExperienceCalculator } from '../../modules/experience/services/ExperienceCalculator';
+import { RankCard } from '../../modules/experience/classes/RankCard';
 import logger from '../../utils/logger';
 
 const command: Command = {
@@ -86,62 +86,23 @@ const command: Command = {
 
             // Get rank from Redis (super fast!)
             const rank = await textExpService.ranking.getUserRank(guildId, targetUser.id);
-            const totalRanked = await textExpService.ranking.getTotalRankedUsers(guildId);
 
-            // Calculate level progress
-            const currentLevel = member.textLevel;
-            const totalXp = member.textTotalXp;
-            const currentLevelXp = ExperienceCalculator.getXpForCurrentLevel(totalXp);
-            const xpForNextLevel = ExperienceCalculator.getXpRequiredForLevel(currentLevel + 1);
-            const xpNeeded = xpForNextLevel - totalXp;
-            const progress = (currentLevelXp / xpForNextLevel) * 100;
+            // Generate rank card
+            const cardBuffer = await RankCard.generate({
+                userId: targetUser.id,
+                username: targetUser.username,
+                discriminator: targetUser.discriminator,
+                avatarUrl: targetUser.displayAvatarURL({ extension: 'png', size: 256 }),
+                level: member.textLevel,
+                totalXp: member.textTotalXp,
+                rank: rank || 0,
+            });
 
-            // Create progress bar
-            const progressBarLength = 20;
-            const filledBars = Math.round((progress / 100) * progressBarLength);
-            const emptyBars = progressBarLength - filledBars;
-            const progressBar = '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+            const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank.png' });
 
-            // Get member for color
-            const guildMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-            const memberColor = guildMember?.displayHexColor || '#5865F2';
-
-            // Build embed
-            const embed = new EmbedBuilder()
-                .setAuthor({
-                    name: `${targetUser.username}'s Rank`,
-                    iconURL: targetUser.displayAvatarURL(),
-                })
-                .setColor(memberColor)
-                .addFields(
-                    {
-                        name: '📊 Rank',
-                        value: rank ? `#${rank} / ${totalRanked}` : 'Unranked',
-                        inline: true,
-                    },
-                    {
-                        name: '⭐ Level',
-                        value: `${currentLevel}`,
-                        inline: true,
-                    },
-                    {
-                        name: '💎 Total XP',
-                        value: totalXp.toLocaleString(),
-                        inline: true,
-                    },
-                    {
-                        name: '📈 Progress to Next Level',
-                        value: `\`${progressBar}\` ${progress.toFixed(1)}%\n${currentLevelXp.toLocaleString()} / ${xpForNextLevel.toLocaleString()} XP (${xpNeeded.toLocaleString()} needed)`,
-                        inline: false,
-                    }
-                )
-                .setTimestamp()
-                .setFooter({
-                    text: `${interaction.guild.name}`,
-                    iconURL: interaction.guild.iconURL() || undefined,
-                });
-
-            await interaction.editReply({ embeds: [embed] });
+            await interaction.editReply({ 
+                files: [attachment]
+            });
         } catch (error) {
             logger.error('Error executing rank command:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
